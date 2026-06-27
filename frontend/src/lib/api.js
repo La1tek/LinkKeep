@@ -44,7 +44,7 @@ export const api = {
   listTabs: () => request('/tabs'),
   createTab: (data) => request('/tabs', { method: 'POST', body: data }),
   updateTab: (id, data) => request(`/tabs/${id}`, { method: 'PUT', body: data }),
-  deleteTab: (id) => request(`/tabs/${id}`, { method: 'DELETE' }),
+  deleteTab: (id, keepLinks = false) => request(`/tabs/${id}?keep_links=${keepLinks}`, { method: 'DELETE' }),
 
   // Links
   listLinks: (params = {}) => {

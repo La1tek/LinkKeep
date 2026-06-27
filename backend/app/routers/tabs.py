@@ -70,9 +70,11 @@ def reorder_tabs(items: List[ReorderItem], user: User = Depends(_get_current_use
 
 
 @router.delete("/{tab_id}", status_code=204)
-def delete_tab(tab_id: int, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+def delete_tab(tab_id: int, keep_links: bool = False, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
     tab = db.query(Tab).filter(Tab.id == tab_id, Tab.user_id == user.id).first()
     if not tab:
         raise HTTPException(status_code=404, detail="Tab not found")
+    if keep_links:
+        db.query(Link).filter(Link.tab_id == tab_id).update({"tab_id": None})
     db.delete(tab)
     db.commit()

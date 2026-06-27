@@ -9,9 +9,10 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, index = 
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.96 }}
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.97 }}
+      transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
       transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.3), ease: [0.16, 1, 0.3, 1] }}
       className="group glass rounded-2xl p-4 transition-all active:scale-[0.99] surface-hover"
     >

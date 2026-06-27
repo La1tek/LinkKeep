@@ -42,28 +42,35 @@ export default function App() {
   const handleDeleteTab = async (id) => {
     const tab = (tabs || []).find(t => t.id === id)
     if (tab && tab.link_count > 0) {
-      const ok = await openConfirm({
+      const result = await openConfirm({
         title: `Delete "${tab.name}"?`,
-        message: `This tab has ${tab.link_count} ${tab.link_count === 1 ? 'link' : 'links'}. They will be permanently deleted.`,
-        danger: true,
-        confirmText: 'Delete Tab & Links',
+        message: `This tab has ${tab.link_count} ${tab.link_count === 1 ? 'link' : 'links'}.`,
+        threeWay: true,
       })
-      if (!ok) return
+      if (!result) return
+      const keepLinks = result === 'keep_links'
+      try {
+        await api.deleteTab(id, keepLinks)
+        await refreshTabs()
+        if (activeTabId === id) setActiveTabId(null)
+        toast.success(keepLinks ? 'Tab deleted, links kept' : 'Tab and links deleted')
+      } catch (err) {
+        toast.error(err.message)
+      }
     } else {
       const ok = await openConfirm({
         title: `Delete "${tab?.name || 'tab'}"?`,
         danger: true,
-        confirmText: 'Delete',
       })
       if (!ok) return
-    }
-    try {
-      await api.deleteTab(id)
-      await refreshTabs()
-      if (activeTabId === id) setActiveTabId(null)
-      toast.success('Tab deleted')
-    } catch (err) {
-      toast.error(err.message)
+      try {
+        await api.deleteTab(id, false)
+        await refreshTabs()
+        if (activeTabId === id) setActiveTabId(null)
+        toast.success('Tab deleted')
+      } catch (err) {
+        toast.error(err.message)
+      }
     }
   }
 
@@ -80,13 +87,13 @@ export default function App() {
       />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
           <motion.div
             key={location.pathname}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: 0.1 }}
             className="flex-1 flex flex-col min-w-0"
           >
             <Routes location={location}>

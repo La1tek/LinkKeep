@@ -117,8 +117,8 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
         ) : processedLinks.length === 0 ? (
           <EmptyState title={search ? 'No matching links' : 'No links yet'} subtitle={search ? 'Try a different search term' : 'Add your first link to get started'} actionLabel={search ? undefined : 'Add Link'} onAction={search ? undefined : () => setModalOpen(true)} />
         ) : (
-          <motion.div layout className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <AnimatePresence mode="popLayout">
+          <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <AnimatePresence>
               {processedLinks.map((link, i) => <LinkCard key={link.id} link={link} index={i} onEdit={(l) => { setEditingLink(l); setModalOpen(true) }} onDelete={handleDeleteLink} onToggleFav={(l) => { toggleFav(l); toast.success(l.is_favorite ? 'Removed from favorites' : 'Added to favorites') }} />)}
             </AnimatePresence>
           </motion.div>
