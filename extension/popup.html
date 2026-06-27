@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { width: 320px; margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #18181b; color: #f4f4f5; }
+    .header { padding: 12px 16px; background: #27272a; border-bottom: 1px solid #3f3f46; }
+    .header h1 { font-size: 14px; font-weight: 600; margin: 0; }
+    .content { padding: 16px; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 11px; color: #71717a; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .field input, .field select { width: 100%; padding: 8px 10px; border: 1px solid #3f3f46; border-radius: 8px; background: #09090b; color: #f4f4f5; font-size: 13px; box-sizing: border-box; }
+    .btn { width: 100%; padding: 10px; border: none; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
+    .btn-primary { background: #6366f1; color: #fff; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .status { padding: 8px; border-radius: 8px; font-size: 12px; margin-bottom: 12px; display: none; }
+    .status.success { display: block; background: rgba(16,185,129,0.1); color: #34d399; }
+    .status.error { display: block; background: rgba(239,68,68,0.1); color: #f87171; }
+    .login-screen, .save-screen { display: none; }
+    .login-screen.active, .save-screen.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>LinkKeep</h1>
+  </div>
+  <div class="content">
+    <div id="status" class="status"></div>
+
+    <div id="loginScreen" class="login-screen">
+      <div class="field">
+        <label>Server URL</label>
+        <input id="serverUrl" placeholder="http://localhost:9091" />
+      </div>
+      <div class="field">
+        <label>Username</label>
+        <input id="username" placeholder="username" />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input id="password" type="password" placeholder="password" />
+      </div>
+      <button id="loginBtn" class="btn btn-primary">Login</button>
+    </div>
+
+    <div id="saveScreen" class="save-screen">
+      <div class="field">
+        <label>Title</label>
+        <input id="title" />
+      </div>
+      <div class="field">
+        <label>URL</label>
+        <input id="url" readonly style="opacity: 0.6" />
+      </div>
+      <div class="field">
+        <label>Group</label>
+        <select id="tabSelect"></select>
+      </div>
+      <button id="saveBtn" class="btn btn-primary">Save Link</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

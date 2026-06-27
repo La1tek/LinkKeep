@@ -104,4 +104,42 @@
     background: linear-gradient(90deg, transparent 0%, var(--shimmer-color) 50%, transparent 100%);
     background-size: 1000px 100%;
   }
+
+  /* Shimmer animation */
+  @keyframes shimmer {
+    0% { background-position: -1000px 0; }
+    100% { background-position: 1000px 0; }
+  }
+  .shimmer {
+    background: linear-gradient(90deg, transparent 0%, var(--shimmer-color) 50%, transparent 100%);
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite;
+  }
+  .shimmer-block {
+    background: var(--shimmer-color);
+    border-radius: 4px;
+    animation: shimmer-fade 1.8s ease-in-out infinite;
+  }
+  @keyframes shimmer-fade {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+  }
+
+  /* Pull-to-refresh */
+  .pull-indicator {
+    transition: transform 0.2s, opacity 0.2s;
+  }
+
+  /* Hide scrollbar */
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Slide up animation for toasts */
+  @keyframes slide-up {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .animate-slide-up {
+    animation: slide-up 0.2s ease-out;
+  }
 }

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Moon, Sun, SignOut, User, GithubLogo, Key, Download, Upload, Trash, ArrowRight } from '@phosphor-icons/react'
+import { Moon, Sun, SignOut, User, GithubLogo, Key, Download, Upload, Trash, ArrowRight, TelegramLogo, House } from '@phosphor-icons/react'
 import { useTheme } from '../lib/theme'
 import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
@@ -15,6 +15,15 @@ export default function Settings({ user }) {
   const [newUsername, setNewUsername] = useState(user?.username || '')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
+  const [botStatus, setBotStatus] = useState(null)
+
+  useEffect(() => {
+    api.getStats().then(() => {
+      fetch('/api/health').then(r => r.json()).then(data => {
+        setBotStatus(data)
+      }).catch(() => {})
+    }).catch(() => {})
+  }, [])
 
   const handleChangeUsername = async (e) => {
     e.preventDefault()
@@ -45,13 +54,11 @@ export default function Settings({ user }) {
   }
 
   const handleExportHtml = () => {
-    const a = document.createElement('a')
-    a.href = `/api/settings/export-html`; a.download = `linkkeep-bookmarks.html`
     const token = localStorage.getItem('lk_token')
-    // Fetch with auth then download
     fetch('/api/settings/export-html', { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.blob()).then(blob => {
-        const url = URL.createObjectURL(blob); a.href = url; a.click(); URL.revokeObjectURL(url)
+        const url = URL.createObjectURL(blob); const a = document.createElement('a')
+        a.href = url; a.download = `linkkeep-bookmarks.html`; a.click(); URL.revokeObjectURL(url)
         toast.success('HTML bookmarks downloaded')
       }).catch(() => toast.error('Export failed'))
   }
@@ -71,7 +78,7 @@ export default function Settings({ user }) {
   }
 
   const handleDeleteAccount = async () => {
-    const ok = await openConfirm({ title: 'Delete account permanently?', message: 'All your tabs, links, and data will be permanently removed.', danger: true, confirmText: 'Delete Everything' })
+    const ok = await openConfirm({ title: 'Delete account permanently?', message: 'All your tabs, links, and data will be permanently removed.', danger: true })
     if (!ok) return
     try { await api.deleteAccount(); toast.success('Account deleted'); setTimeout(() => { logout(); window.location.reload() }, 1000) }
     catch (err) { toast.error(err.message) }
@@ -140,9 +147,49 @@ export default function Settings({ user }) {
           </div>
         </Section>
 
+        <Section title="Telegram Bot">
+          <div className="glass rounded-2xl p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-10 w-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center"><TelegramLogo size={20} className="text-sky-400" /></div>
+              <div className="flex-1">
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Telegram Integration</p>
+                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                  {botStatus?.bot ? 'Bot is active' : 'Bot is not configured'}
+                </p>
+              </div>
+              <div className={`h-2 w-2 rounded-full ${botStatus?.bot ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
+            </div>
+            <div className="text-xs space-y-2" style={{ color: 'var(--text-muted)' }}>
+              <p>To enable:</p>
+              <ol className="list-decimal list-inside space-y-1 ml-1">
+                <li>Create a bot via <span style={{ color: 'var(--text-tertiary)' }}>@BotFather</span> on Telegram</li>
+                <li>Set <code className="px-1 py-0.5 rounded surface text-[10px]">TELEGRAM_BOT_TOKEN</code> in server .env</li>
+                <li>Restart backend</li>
+                <li>Message your bot: <code className="px-1 py-0.5 rounded surface text-[10px]">/start username password</code></li>
+              </ol>
+              <p className="pt-1">Then just send URLs to the bot to save them.</p>
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Browser Extension">
+          <div className="glass rounded-2xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-accent-500/10 border border-accent-500/20 flex items-center justify-center"><House size={20} className="text-accent-400" /></div>
+              <div className="flex-1">
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Chrome Extension</p>
+                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>One-click save from any page</p>
+              </div>
+            </div>
+            <div className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
+              Load <code className="px-1 py-0.5 rounded surface text-[10px]">/extension</code> folder in chrome://extensions (Developer mode)
+            </div>
+          </div>
+        </Section>
+
         <Section title="About">
           <div className="glass rounded-2xl p-4 space-y-2">
-            <Row label="Version" value="2.1.0" mono />
+            <Row label="Version" value="2.2.0" mono />
             <Row label="Stack" value="FastAPI + React + Vite" />
             <a href="https://github.com/La1tek/LinkKeep" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-accent-400 hover:text-accent-300 pt-1"><GithubLogo size={14} />github.com/La1tek/LinkKeep</a>
           </div>

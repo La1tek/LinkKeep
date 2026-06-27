@@ -45,12 +45,15 @@ export const api = {
   createTab: (data) => request('/tabs', { method: 'POST', body: data }),
   updateTab: (id, data) => request(`/tabs/${id}`, { method: 'PUT', body: data }),
   deleteTab: (id, keepLinks = false) => request(`/tabs/${id}?keep_links=${keepLinks}`, { method: 'DELETE' }),
+  reorderTabs: (items) => request('/tabs/reorder', { method: 'POST', body: items }),
 
   // Links
   listLinks: (params = {}) => {
     const q = new URLSearchParams()
     if (params.tab_id != null) q.set('tab_id', params.tab_id)
     if (params.favorite != null) q.set('favorite', params.favorite)
+    if (params.pinned != null) q.set('pinned', params.pinned)
+    if (params.ungrouped) q.set('ungrouped', 'true')
     if (params.q) q.set('q', params.q)
     const qs = q.toString()
     return request(`/links${qs ? `?${qs}` : ''}`)
@@ -59,6 +62,10 @@ export const api = {
   updateLink: (id, data) => request(`/links/${id}`, { method: 'PUT', body: data }),
   deleteLink: (id) => request(`/links/${id}`, { method: 'DELETE' }),
   toggleFavorite: (id) => request(`/links/${id}/toggle-favorite`, { method: 'POST' }),
+  togglePin: (id) => request(`/links/${id}/toggle-pin`, { method: 'POST' }),
+  reorderLinks: (items) => request('/links/reorder', { method: 'POST', body: items }),
+  bulkAction: (linkIds, action, tabId = null) =>
+    request('/links/bulk', { method: 'POST', body: { link_ids: linkIds, action, tab_id: tabId } }),
 
   // Metadata
   fetchMetadata: (url) => request('/metadata', { method: 'POST', body: { url } }),
@@ -74,11 +81,6 @@ export const api = {
   exportData: () => request('/settings/export'),
   importData: (data) => request('/settings/import', { method: 'POST', body: data }),
   deleteAccount: () => request('/settings/account', { method: 'DELETE' }),
-  exportHtml: () => `${API_URL}/settings/export-html`,
-
-  // Reorder
-  reorderTabs: (items) => request('/tabs/reorder', { method: 'POST', body: items }),
-  reorderLinks: (items) => request('/links/reorder', { method: 'POST', body: items }),
 
   // Duplicates
   findDuplicates: () => request('/links/duplicates'),

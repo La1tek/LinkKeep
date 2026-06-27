@@ -33,7 +33,7 @@ class TabBase(BaseModel):
 
 
 class TabCreate(TabBase):
-    pass
+    parent_id: Optional[int] = None
 
 
 class TabUpdate(BaseModel):
@@ -41,11 +41,13 @@ class TabUpdate(BaseModel):
     icon: Optional[str] = None
     color: Optional[str] = None
     sort_order: Optional[int] = None
+    parent_id: Optional[int] = None
 
 
 class TabOut(TabBase):
     id: int
     sort_order: int
+    parent_id: Optional[int] = None
     created_at: datetime
     link_count: int = 0
 
@@ -63,6 +65,8 @@ class LinkBase(BaseModel):
     tab_id: Optional[int] = None
     tags: List[str] = []
     is_favorite: bool = False
+    is_pinned: bool = False
+    note: Optional[str] = None
 
 
 class LinkCreate(LinkBase):
@@ -77,6 +81,8 @@ class LinkUpdate(BaseModel):
     tab_id: Optional[int] = None
     tags: Optional[List[str]] = None
     is_favorite: Optional[bool] = None
+    is_pinned: Optional[bool] = None
+    note: Optional[str] = None
     sort_order: Optional[int] = None
 
 
@@ -88,6 +94,18 @@ class LinkOut(LinkBase):
 
     class Config:
         from_attributes = True
+
+
+# ── Bulk ────────────────────────────────────────────
+
+class BulkLinkAction(BaseModel):
+    link_ids: List[int]
+    action: str  # "delete", "move", "pin", "unpin", "favorite", "unfavorite"
+    tab_id: Optional[int] = None
+
+
+class BulkResult(BaseModel):
+    affected: int
 
 
 # ── Metadata ─────────────────────────────────────────
@@ -108,4 +126,13 @@ class StatsOut(BaseModel):
     total_links: int
     total_tabs: int
     total_favorites: int
+    total_pinned: int
     recent_links: List[LinkOut] = []
+
+
+# ── Bot ──────────────────────────────────────────────
+
+class BotStatus(BaseModel):
+    enabled: bool
+    username: Optional[str] = None
+    webhook_url: Optional[str] = None

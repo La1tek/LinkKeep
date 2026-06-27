@@ -28,11 +28,13 @@ class Tab(Base):
     icon = Column(String(64), default="FolderSimple")
     color = Column(String(16), default="#6366f1")
     sort_order = Column(Integer, default=0)
+    parent_id = Column(Integer, ForeignKey("tabs.id", ondelete="SET NULL"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     owner = relationship("User", back_populates="tabs")
     links = relationship("Link", back_populates="tab", cascade="all, delete-orphan")
+    parent = relationship("Tab", remote_side=[id], backref="children")
 
 
 class Link(Base):
@@ -46,6 +48,8 @@ class Link(Base):
     tab_id = Column(Integer, ForeignKey("tabs.id", ondelete="CASCADE"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     is_favorite = Column(Boolean, default=False)
+    is_pinned = Column(Boolean, default=False)
+    note = Column(Text, nullable=True)
     sort_order = Column(Integer, default=0)
     tags = Column(JSON, default=list)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

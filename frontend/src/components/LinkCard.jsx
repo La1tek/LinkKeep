@@ -1,15 +1,50 @@
-import { Star, DotsThreeVertical, ArrowUpRight, Trash, PencilSimple } from '@phosphor-icons/react'
-import { useState } from 'react'
+import { Star, DotsThreeVertical, ArrowUpRight, Trash, PencilSimple, PushPin, PushPinSlash, NotePencil, Check } from '@phosphor-icons/react'
+import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-export default function LinkCard({ link, onEdit, onDelete, onToggleFav, index = 0 }) {
+export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onTogglePin, onSelect, selected, selectionMode, index = 0 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showNote, setShowNote] = useState(false)
+  const longPressTimer = useRef(null)
   const favicon = link.favicon || `https://www.google.com/s2/favicons?domain=${encodeURIComponent(link.url)}&sz=64`
+
+  const handleTouchStart = () => {
+    longPressTimer.current = setTimeout(() => {
+      if (onSelect) onSelect(link)
+    }, 500)
+  }
+
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current)
+  }
 
   return (
     <div
-      className="group glass rounded-2xl p-4 transition-all active:scale-[0.99] surface-hover"
+      onContextMenu={(e) => { e.preventDefault(); if (onSelect) onSelect(link) }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchMove={handleTouchEnd}
+      className={`group glass rounded-2xl p-4 transition-all surface-hover ${link.is_pinned ? 'ring-1 ring-accent-500/30' : ''} ${selected ? 'ring-2 ring-accent-500' : ''}`}
     >
+      {/* Pinned indicator */}
+      {link.is_pinned && (
+        <div className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-accent-600 flex items-center justify-center shadow-lg">
+          <PushPin size={10} weight="fill" className="text-white" />
+        </div>
+      )}
+
+      {/* Selection checkbox */}
+      {selectionMode && (
+        <button
+          onClick={() => onSelect?.(link)}
+          className="absolute top-2 left-2 z-10"
+        >
+          <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-all ${selected ? 'bg-accent-600 border-accent-600' : 'border-gray-400'}`}>
+            {selected && <Check size={12} weight="bold" className="text-white" />}
+          </div>
+        </button>
+      )}
+
       <div className="flex items-start gap-3">
         <div className="relative shrink-0">
           <div className="absolute inset-0 blur-md bg-accent-500/5 rounded-lg" />
@@ -31,7 +66,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, index = 
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          <button onClick={() => onToggleFav(link)}
+          <button onClick={() => onToggleFav?.(link)}
             className="p-1.5 rounded-lg transition-colors hover:bg-amber-400/10"
             style={{ color: link.is_favorite ? '#fbbf24' : 'var(--text-muted)' }}
           >
@@ -49,14 +84,24 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, index = 
             <AnimatePresence>
               {menuOpen && (
                 <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }}
-                  className="absolute right-0 top-full mt-1 z-20 glass rounded-xl py-1 min-w-[140px]"
+                  className="absolute right-0 top-full mt-1 z-20 glass rounded-xl py-1 min-w-[160px] shadow-xl"
                 >
-                  <button onClick={() => { onEdit(link); setMenuOpen(false) }}
+                  <button onClick={() => { onEdit?.(link); setMenuOpen(false) }}
                     className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
                   >
                     <PencilSimple size={13} /> Edit
                   </button>
-                  <button onClick={() => { onDelete(link); setMenuOpen(false) }}
+                  <button onClick={() => { onTogglePin?.(link); setMenuOpen(false) }}
+                    className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
+                  >
+                    {link.is_pinned ? <><PushPinSlash size={13} /> Unpin</> : <><PushPin size={13} /> Pin to top</>}
+                  </button>
+                  <button onClick={() => { setShowNote(!showNote); setMenuOpen(false) }}
+                    className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
+                  >
+                    <NotePencil size={13} /> {link.note ? 'Edit note' : 'Add note'}
+                  </button>
+                  <button onClick={() => { onDelete?.(link); setMenuOpen(false) }}
                     className="w-full px-3 py-2 text-left text-xs hover:bg-red-500/10 flex items-center gap-2 text-red-400"
                   >
                     <Trash size={13} /> Delete
@@ -67,6 +112,29 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, index = 
           </div>
         </div>
       </div>
+
+      {/* Note */}
+      {showNote && (
+        <div className="mt-3">
+          <textarea
+            defaultValue={link.note || ''}
+            placeholder="Add a note..."
+            onBlur={(e) => {
+              onEdit?.({ ...link, note: e.target.value })
+              setShowNote(false)
+            }}
+            autoFocus
+            className="input-base w-full rounded-xl px-3 py-2 text-xs outline-none resize-none"
+            rows={2}
+          />
+        </div>
+      )}
+      {!showNote && link.note && (
+        <div className="mt-2 ml-13 text-xs flex items-start gap-1.5" style={{ color: 'var(--text-muted)' }}>
+          <NotePencil size={12} className="shrink-0 mt-0.5" />
+          <span className="italic line-clamp-2">{link.note}</span>
+        </div>
+      )}
 
       {link.tags && link.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-3 ml-13">
