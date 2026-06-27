@@ -1,19 +1,13 @@
-import { motion, AnimatePresence } from 'framer-motion'
 import { Star, DotsThreeVertical, ArrowUpRight, Trash, PencilSimple } from '@phosphor-icons/react'
 import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function LinkCard({ link, onEdit, onDelete, onToggleFav, index = 0 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const favicon = link.favicon || `https://www.google.com/s2/favicons?domain=${encodeURIComponent(link.url)}&sz=64`
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.97 }}
-      transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
-      transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.3), ease: [0.16, 1, 0.3, 1] }}
+    <div
       className="group glass rounded-2xl p-4 transition-all active:scale-[0.99] surface-hover"
     >
       <div className="flex items-start gap-3">
@@ -52,22 +46,24 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, index = 
             >
               <DotsThreeVertical size={16} weight="bold" />
             </button>
-            {menuOpen && (
-              <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                className="absolute right-0 top-full mt-1 z-20 glass rounded-xl py-1 min-w-[140px]"
-              >
-                <button onClick={() => { onEdit(link); setMenuOpen(false) }}
-                  className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
+            <AnimatePresence>
+              {menuOpen && (
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }}
+                  className="absolute right-0 top-full mt-1 z-20 glass rounded-xl py-1 min-w-[140px]"
                 >
-                  <PencilSimple size={13} /> Edit
-                </button>
-                <button onClick={() => { onDelete(link); setMenuOpen(false) }}
-                  className="w-full px-3 py-2 text-left text-xs hover:bg-red-500/10 flex items-center gap-2 text-red-400"
-                >
-                  <Trash size={13} /> Delete
-                </button>
-              </motion.div>
-            )}
+                  <button onClick={() => { onEdit(link); setMenuOpen(false) }}
+                    className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
+                  >
+                    <PencilSimple size={13} /> Edit
+                  </button>
+                  <button onClick={() => { onDelete(link); setMenuOpen(false) }}
+                    className="w-full px-3 py-2 text-left text-xs hover:bg-red-500/10 flex items-center gap-2 text-red-400"
+                  >
+                    <Trash size={13} /> Delete
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
@@ -79,6 +75,6 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, index = 
           ))}
         </div>
       )}
-    </motion.div>
+    </div>
   )
 }

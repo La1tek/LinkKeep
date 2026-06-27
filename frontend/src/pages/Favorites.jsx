@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 import { Star as StarIcon } from '@phosphor-icons/react'
 import { useLinks } from '../hooks/useLinks'
 import { useTabStore } from '../hooks/useTabStore'
@@ -66,11 +65,9 @@ export default function Favorites({ token }) {
         ) : processedLinks.length === 0 ? (
           <EmptyState icon={<StarIcon size={40} weight="light" className="text-amber-400/60" />} title="No favorites yet" subtitle="Star important links to find them here instantly" />
         ) : (
-          <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <AnimatePresence>
-              {processedLinks.map((link, i) => <LinkCard key={link.id} link={link} index={i} onEdit={(l) => { setEditingLink(l); setModalOpen(true) }} onDelete={handleDelete} onToggleFav={(l) => { toggleFav(l); toast.success(l.is_favorite ? 'Removed from favorites' : 'Added to favorites') }} />)}
-            </AnimatePresence>
-          </motion.div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {processedLinks.map((link, i) => <LinkCard key={link.id} link={link} index={i} onEdit={(l) => { setEditingLink(l); setModalOpen(true) }} onDelete={handleDelete} onToggleFav={(l) => { toggleFav(l.id); toast.success(l.is_favorite ? 'Removed from favorites' : 'Added to favorites') }} />)}
+          </div>
         )}
       </main>
 

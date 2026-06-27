@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Stack, FolderSimple } from '@phosphor-icons/react'
+import { Plus, Stack, FolderSimple, Check, X } from '@phosphor-icons/react'
 import { useTabStore } from '../hooks/useTabStore'
 import { useLinks } from '../hooks/useLinks'
 import LinkCard from '../components/LinkCard'
@@ -19,6 +18,9 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
   const [activeTag, setActiveTag] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingLink, setEditingLink] = useState(null)
+  const [newTabOpen, setNewTabOpen] = useState(false)
+  const [newTabName, setNewTabName] = useState('')
+  const [newTabColor, setNewTabColor] = useState('#6366f1')
   const toast = useToast()
 
   const linkParams = useMemo(() => {
@@ -108,6 +110,7 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
               <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tab.color || '#6366f1' }} />{tab.name}<span className="opacity-50">{tab.link_count}</span>
             </button>
           ))}
+          <button onClick={() => setNewTabOpen(true)} className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium glass transition-all flex items-center gap-1" style={{ color: 'var(--text-muted)' }}><Plus size={12} weight="bold" />New</button>
         </div>
       </div>
 
@@ -117,17 +120,35 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
         ) : processedLinks.length === 0 ? (
           <EmptyState title={search ? 'No matching links' : 'No links yet'} subtitle={search ? 'Try a different search term' : 'Add your first link to get started'} actionLabel={search ? undefined : 'Add Link'} onAction={search ? undefined : () => setModalOpen(true)} />
         ) : (
-          <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <AnimatePresence>
-              {processedLinks.map((link, i) => <LinkCard key={link.id} link={link} index={i} onEdit={(l) => { setEditingLink(l); setModalOpen(true) }} onDelete={handleDeleteLink} onToggleFav={(l) => { toggleFav(l); toast.success(l.is_favorite ? 'Removed from favorites' : 'Added to favorites') }} />)}
-            </AnimatePresence>
-          </motion.div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {processedLinks.map((link, i) => <LinkCard key={link.id} link={link} index={i} onEdit={(l) => { setEditingLink(l); setModalOpen(true) }} onDelete={handleDeleteLink} onToggleFav={(l) => { toggleFav(l.id); toast.success(l.is_favorite ? 'Removed from favorites' : 'Added to favorites') }} />)}
+          </div>
         )}
       </main>
 
       <button onClick={() => { setEditingLink(null); setModalOpen(true) }} className="sm:hidden fixed bottom-20 right-4 z-40 h-14 w-14 bg-accent-600 text-white rounded-2xl shadow-lg shadow-accent-600/30 flex items-center justify-center active:scale-90 transition-transform"><Plus size={24} weight="bold" /></button>
 
       <LinkModal open={modalOpen} onClose={() => { setModalOpen(false); setEditingLink(null) }} onSubmit={handleAddLink} initial={editingLink} tabs={safeTabs} />
+
+      {newTabOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }} onClick={() => setNewTabOpen(false)}>
+          <div className="glass rounded-2xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>New Group</h3>
+            <input autoFocus value={newTabName} onChange={(e) => setNewTabName(e.target.value)} placeholder="Group name..." className="input-base w-full rounded-xl px-4 py-2.5 text-sm outline-none mb-3" onKeyDown={(e) => { if (e.key === 'Enter' && newTabName.trim()) { createTab({ name: newTabName.trim(), color: newTabColor }); setNewTabName(''); setNewTabColor('#6366f1'); setNewTabOpen(false); toast.success('Group created') } }} />
+            {newTabName.trim() && (
+              <div className="flex items-center gap-2 mb-4">
+                {['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#ef4444'].map(c => (
+                  <button key={c} type="button" onClick={() => setNewTabColor(c)} className={`h-5 w-5 rounded-full transition-transform ${newTabColor === c ? 'scale-125 ring-2 ring-white/20' : ''}`} style={{ backgroundColor: c }} />
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => { if (newTabName.trim()) { createTab({ name: newTabName.trim(), color: newTabColor }); setNewTabName(''); setNewTabColor('#6366f1'); setNewTabOpen(false); toast.success('Group created') } }} disabled={!newTabName.trim()} className="flex-1 bg-accent-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-accent-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all">Create</button>
+              <button onClick={() => setNewTabOpen(false)} className="glass px-4 py-2.5 rounded-xl text-sm surface-hover" style={{ color: 'var(--text-secondary)' }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
