@@ -7,35 +7,52 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  html { color-scheme: dark; }
+  html.light { color-scheme: light; }
+
   body {
     font-family: 'Geist', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Custom scrollbar */
+  /* Dark (default) */
+  body { @apply bg-zinc-950 text-zinc-100; }
+
+  /* Light */
+  html.light body { @apply bg-zinc-50 text-zinc-900; }
+  html.light .glass {
+    background: rgba(255, 255, 255, 0.75);
+    border-color: rgba(0, 0, 0, 0.06);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 3px rgba(0,0,0,0.04);
+  }
+  html.light .text-zinc-100 { color: #18181b !important; }
+  html.light .text-zinc-200 { color: #27272a !important; }
+  html.light .text-zinc-300 { color: #3f3f46 !important; }
+  html.light .text-zinc-400 { color: #52525b !important; }
+  html.light .text-zinc-500 { color: #71717a !important; }
+  html.light .text-zinc-600 { color: #a1a1aa !important; }
+  html.light .text-zinc-700 { color: #d4d4d8 !important; }
+  html.light .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.03) !important; }
+  html.light .bg-white\/\[0\.05\] { background-color: rgba(0,0,0,0.04) !important; }
+  html.light .bg-white\/\[0\.02\]:hover { background-color: rgba(0,0,0,0.03) !important; }
+  html.light .border-white\/\[0\.06\] { border-color: rgba(0,0,0,0.07) !important; }
+  html.light .border-white\/\[0\.08\] { border-color: rgba(0,0,0,0.08) !important; }
+  html.light .hover\:bg-white\/5:hover { background-color: rgba(0,0,0,0.04) !important; }
+  html.light .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(0,0,0,0.03) !important; }
+  html.light .divide-white\/\[0\.04\] > * { border-color: rgba(0,0,0,0.06) !important; }
+
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb {
-    background: rgba(120, 120, 140, 0.25);
-    border-radius: 999px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(120, 120, 140, 0.45);
-  }
+  ::-webkit-scrollbar-thumb { background: rgba(120, 120, 140, 0.25); border-radius: 999px; }
 }
 
 @layer components {
   .glass {
-    @apply backdrop-blur-xl border border-white/[0.08];
+    @apply backdrop-blur-xl border;
     background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.08);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  }
-
-  .glass-light {
-    @apply backdrop-blur-xl border border-black/[0.06];
-    background: rgba(255, 255, 255, 0.72);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
   }
 
   .shimmer-bg {

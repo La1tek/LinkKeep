@@ -1,5 +1,5 @@
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from './hooks/useAuth'
 import Login from './pages/Login'
@@ -8,17 +8,17 @@ import Favorites from './pages/Favorites'
 import Settings from './pages/Settings'
 import Sidebar from './components/Sidebar'
 import BottomNav from './components/BottomNav'
-import { ToastContainer } from './components/Toast'
-import { ConfirmModal } from './components/ConfirmModal'
+import { ToastContainer, useToast } from './components/Toast'
+import { ConfirmModal, openConfirm } from './components/ConfirmModal'
 import { useTabs } from './hooks/useTabs'
 import { api } from './lib/api'
-import { useState } from 'react'
 
 export default function App() {
   const { token, user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [activeTabId, setActiveTabId] = useState(null)
+  const toast = useToast()
 
   const { tabs, create: createTab, remove: deleteTab, refresh: refreshTabs } = useTabs(token)
 
@@ -36,9 +36,31 @@ export default function App() {
   )
 
   const handleDeleteTab = async (id) => {
-    await api.deleteTab(id)
-    await refreshTabs()
-    if (activeTabId === id) setActiveTabId(null)
+    const tab = (tabs || []).find(t => t.id === id)
+    if (tab && tab.link_count > 0) {
+      const ok = await openConfirm({
+        title: `Delete "${tab.name}"?`,
+        message: `This tab has ${tab.link_count} ${tab.link_count === 1 ? 'link' : 'links'}. They will be permanently deleted.`,
+        danger: true,
+        confirmText: 'Delete Tab & Links',
+      })
+      if (!ok) return
+    } else {
+      const ok = await openConfirm({
+        title: `Delete "${tab?.name || 'tab'}"?`,
+        danger: true,
+        confirmText: 'Delete',
+      })
+      if (!ok) return
+    }
+    try {
+      await api.deleteTab(id)
+      await refreshTabs()
+      if (activeTabId === id) setActiveTabId(null)
+      toast.success('Tab deleted')
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   return (

@@ -24,7 +24,6 @@ export default function Login() {
 
   return (
     <div className="min-h-[100dvh] flex items-center justify-center p-4 bg-zinc-950 relative overflow-hidden">
-      {/* Ambient glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-accent-600/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[100px] pointer-events-none" />
 
@@ -34,7 +33,6 @@ export default function Login() {
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         className="relative w-full max-w-sm"
       >
-        {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <div className="h-14 w-14 rounded-2xl bg-accent-600 flex items-center justify-center mb-4">
             <FolderSimple size={28} weight="fill" className="text-white" />
@@ -43,7 +41,6 @@ export default function Login() {
           <p className="text-sm text-zinc-500 mt-1">Your premium link sanctuary</p>
         </div>
 
-        {/* Form card */}
         <div className="glass rounded-2xl p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
@@ -97,6 +94,8 @@ export default function Login() {
               : 'Already have an account? Sign in'}
           </button>
         </div>
+
+        <p className="text-center text-[10px] text-zinc-700 mt-6 font-mono">LinkKeep v2.1</p>
       </motion.div>
     </div>
   )
