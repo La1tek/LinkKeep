@@ -12,7 +12,7 @@ import { useToast } from '../components/Toast'
 import { openConfirm } from '../components/ConfirmModal'
 
 export default function Dashboard({ token, user, onNavigate, initialTabId }) {
-  const { tabs, create: createTab } = useTabs(token)
+  const { tabs, create: createTab, refresh: refreshTabs } = useTabs(token)
   const [activeTabId, setActiveTabId] = useState(initialTabId || null)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('newest')
@@ -57,6 +57,7 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
       if (editingLink) { await updateLink(editingLink.id, data); toast.success('Link updated') }
       else { await createLink(data); toast.success('Link added') }
       setModalOpen(false); setEditingLink(null)
+      refreshTabs()
     } catch (err) { toast.error(err.message) }
   }
 
@@ -64,6 +65,7 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
     const ok = await openConfirm({ title: `Delete "${link.title}"?`, danger: true, confirmText: 'Delete' })
     if (!ok) return
     await deleteLink(link.id); toast.success('Link deleted')
+    refreshTabs()
   }
 
   return (

@@ -67,20 +67,22 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
               autoFocus
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              onBlur={() => { if (!newName) setCreating(false) }}
+              onBlur={() => { if (!newName.trim()) setCreating(false) }}
               placeholder="Tab name..."
               className="input-base w-full rounded-lg px-3 py-2 text-sm outline-none"
             />
-            <div className="flex items-center gap-2">
-              <label className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Color:</label>
-              {COLORS.map(c => (
-                <button key={c} type="button" onClick={() => setNewColor(c)}
-                  className={`h-4 w-4 rounded-full transition-transform ${newColor === c ? 'scale-125 ring-2 ring-white/20' : ''}`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
-            </div>
-            <button type="submit" className="w-full bg-accent-600 text-white py-1.5 rounded-lg text-xs font-medium hover:bg-accent-500">
+            {newName.trim() && (
+              <div className="flex items-center gap-2">
+                <label className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Color:</label>
+                {COLORS.map(c => (
+                  <button key={c} type="button" onClick={() => setNewColor(c)}
+                    className={`h-4 w-4 rounded-full transition-transform ${newColor === c ? 'scale-125 ring-2 ring-white/20' : ''}`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            )}
+            <button type="submit" disabled={!newName.trim()} className="w-full bg-accent-600 text-white py-1.5 rounded-lg text-xs font-medium hover:bg-accent-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
               Create
             </button>
           </form>
