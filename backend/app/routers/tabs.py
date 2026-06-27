@@ -30,6 +30,7 @@ def create_tab(tab: TabCreate, user: User = Depends(_get_current_user), db: Sess
         icon=tab.icon,
         color=tab.color,
         sort_order=max_order,
+        parent_id=tab.parent_id,
         user_id=user.id,
     )
     db.add(new_tab)
