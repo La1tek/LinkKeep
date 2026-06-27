@@ -1,9 +1,8 @@
 import { motion } from 'framer-motion'
-import { House, Star, Stack, GearSix } from '@phosphor-icons/react'
+import { House, Star, GearSix } from '@phosphor-icons/react'
 
 const navItems = [
   { path: '/', label: 'Home', icon: House },
-  { path: '/all', label: 'All', icon: Stack },
   { path: '/favorites', label: 'Saved', icon: Star },
   { path: '/settings', label: 'Settings', icon: GearSix },
 ]
@@ -19,7 +18,7 @@ export default function BottomNav({ activePath, onNavigate }) {
             <button
               key={item.path}
               onClick={() => onNavigate(item.path)}
-              className="relative flex flex-col items-center gap-0.5 px-4 py-1.5"
+              className="relative flex flex-col items-center gap-0.5 px-6 py-1.5"
             >
               {active && (
                 <motion.div

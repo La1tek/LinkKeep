@@ -101,7 +101,6 @@ export default function App() {
                 path="/"
                 element={<Dashboard token={token} user={user} onNavigate={navigate} initialTabId={activeTabId} />}
               />
-              <Route path="/all" element={<Dashboard token={token} user={user} onNavigate={navigate} />} />
               <Route path="/favorites" element={<Favorites token={token} />} />
               <Route path="/settings" element={<Settings user={user} />} />
             </Routes>
