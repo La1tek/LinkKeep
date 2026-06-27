@@ -48,11 +48,11 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
               >
                 <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: tab.color || '#6366f1' }} />
                 <span className="truncate">{tab.name}</span>
-                <span className="text-[10px] ml-auto" style={{ color: 'var(--text-muted)' }}>{tab.link_count}</span>
+                <span className="text-[10px] ml-auto group-hover:hidden" style={{ color: 'var(--text-muted)' }}>{tab.link_count}</span>
               </motion.button>
               <button
                 onClick={() => onDeleteTab(tab.id)}
-                className="absolute right-2 opacity-0 group-hover:opacity-100 p-1 transition-all hover:text-red-400"
+                className="hidden group-hover:block absolute right-2 top-1/2 -translate-y-1/2 p-1 transition-all hover:text-red-400"
                 style={{ color: 'var(--text-muted)' }}
               >
                 <X size={12} />
