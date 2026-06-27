@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, House, Stack, Star, ArrowLeft } from '@phosphor-icons/react'
 import { useTabs } from '../hooks/useTabs'
 import { useLinks } from '../hooks/useLinks'
