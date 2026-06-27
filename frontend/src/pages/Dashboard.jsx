@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Stack, FolderSimple } from '@phosphor-icons/react'
-import { useTabs } from '../hooks/useTabs'
+import { useTabStore } from '../hooks/useTabStore'
 import { useLinks } from '../hooks/useLinks'
 import LinkCard from '../components/LinkCard'
 import LinkModal from '../components/LinkModal'
@@ -12,7 +12,7 @@ import { useToast } from '../components/Toast'
 import { openConfirm } from '../components/ConfirmModal'
 
 export default function Dashboard({ token, user, onNavigate, initialTabId }) {
-  const { tabs, create: createTab, refresh: refreshTabs } = useTabs(token)
+  const { tabs, create: createTab, refresh: refreshTabs } = useTabStore()
   const [activeTabId, setActiveTabId] = useState(initialTabId || null)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('newest')

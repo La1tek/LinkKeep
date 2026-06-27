@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Star as StarIcon } from '@phosphor-icons/react'
 import { useLinks } from '../hooks/useLinks'
-import { useTabs } from '../hooks/useTabs'
+import { useTabStore } from '../hooks/useTabStore'
 import LinkCard from '../components/LinkCard'
 import LinkModal from '../components/LinkModal'
 import SearchBar from '../components/SearchBar'
@@ -12,7 +12,7 @@ import { useToast } from '../components/Toast'
 import { openConfirm } from '../components/ConfirmModal'
 
 export default function Favorites({ token }) {
-  const { tabs } = useTabs(token)
+  const { tabs } = useTabStore()
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('newest')
   const [modalOpen, setModalOpen] = useState(false)

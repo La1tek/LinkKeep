@@ -10,7 +10,7 @@ import Sidebar from './components/Sidebar'
 import BottomNav from './components/BottomNav'
 import { ToastContainer, useToast } from './components/Toast'
 import { ConfirmModal, openConfirm } from './components/ConfirmModal'
-import { useTabs } from './hooks/useTabs'
+import { useTabStore } from './hooks/useTabStore'
 import { api } from './lib/api'
 
 export default function App() {
@@ -20,13 +20,17 @@ export default function App() {
   const [activeTabId, setActiveTabId] = useState(null)
   const toast = useToast()
 
-  const { tabs, create: createTab, remove: deleteTab, refresh: refreshTabs } = useTabs(token)
+  const { tabs, create: createTab, remove: deleteTab, refresh: refreshTabs } = useTabStore()
 
   useEffect(() => {
     const handler = () => logout()
     window.addEventListener('auth-expired', handler)
     return () => window.removeEventListener('auth-expired', handler)
   }, [logout])
+
+  useEffect(() => {
+    if (token) refreshTabs()
+  }, [token, refreshTabs])
 
   if (!token) return (
     <>
