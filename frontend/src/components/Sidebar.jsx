@@ -25,12 +25,12 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
 
   return (
     <aside className="hidden sm:flex flex-col w-60 shrink-0 h-[100dvh] sticky top-0" style={{ borderRight: '1px solid var(--border-subtle)' }}>
-      <div className="px-5 py-5 flex items-center gap-2.5">
-        <div className="h-8 w-8 rounded-xl bg-accent-600 flex items-center justify-center">
+      <button onClick={() => navigate('/')} className="px-5 py-5 flex items-center gap-2.5 group cursor-pointer">
+        <div className="h-8 w-8 rounded-xl bg-accent-600 flex items-center justify-center transition-transform group-hover:scale-105">
           <FolderSimple size={18} weight="fill" className="text-white" />
         </div>
-        <span className="text-base font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>LinkKeep</span>
-      </div>
+        <span className="text-base font-bold tracking-tight transition-colors group-hover:text-accent-400" style={{ color: 'var(--text-primary)' }}>LinkKeep</span>
+      </button>
 
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
         {safeTabs.map(tab => {

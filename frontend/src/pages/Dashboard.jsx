@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, House, Stack } from '@phosphor-icons/react'
+import { Plus, Stack, FolderSimple } from '@phosphor-icons/react'
 import { useTabs } from '../hooks/useTabs'
 import { useLinks } from '../hooks/useLinks'
 import LinkCard from '../components/LinkCard'
@@ -71,7 +71,11 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
       <header className="sticky top-0 z-30 glass px-4 sm:px-8 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => onNavigate('/')} className="sm:hidden p-2 -ml-2" style={{ color: 'var(--text-tertiary)' }}><House size={18} /></button>
+            <button onClick={() => onNavigate('/')} className="sm:hidden p-2 -ml-2 flex items-center gap-1.5" style={{ color: 'var(--text-tertiary)' }}>
+              <div className="h-6 w-6 rounded-lg bg-accent-600 flex items-center justify-center">
+                <FolderSimple size={13} weight="fill" className="text-white" />
+              </div>
+            </button>
             <div className="min-w-0">
               <h1 className="text-base font-semibold tracking-tight truncate" style={{ color: 'var(--text-primary)' }}>{activeTab ? activeTab.name : 'All Links'}</h1>
               <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>{processedLinks.length} {processedLinks.length === 1 ? 'link' : 'links'}{activeTag && <span className="text-accent-400 ml-1">#{activeTag}</span>}</p>
