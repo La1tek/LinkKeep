@@ -40,7 +40,7 @@ export default function App() {
     <div className="flex min-h-[100dvh] bg-zinc-950 text-zinc-100">
       {/* Desktop sidebar */}
       <Sidebar
-        tabs={tabs}
+        tabs={tabs || []}
         activeTabId={activeTabId}
         onSelectTab={(id) => { setActiveTabId(id); navigate('/') }}
         onCreateTab={createTab}

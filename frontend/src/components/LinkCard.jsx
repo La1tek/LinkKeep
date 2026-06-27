@@ -102,7 +102,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, index = 
       {/* Tags */}
       {link.tags && link.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-3 ml-13">
-          {link.tags.map((tag, i) => (
+          {(link.tags || []).map((tag, i) => (
             <span
               key={i}
               className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-zinc-400 border border-white/[0.06]"

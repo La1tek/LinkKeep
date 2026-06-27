@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, House, Stack, Star, ArrowLeft } from '@phosphor-icons/react'
+import { Plus, House, Stack } from '@phosphor-icons/react'
 import { useTabs } from '../hooks/useTabs'
 import { useLinks } from '../hooks/useLinks'
 import LinkCard from '../components/LinkCard'
@@ -25,7 +25,9 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
 
   const { links, loading, create: createLink, update: updateLink, remove: deleteLink, toggleFav } = useLinks(token, linkParams)
 
-  const activeTab = tabs.find(t => t.id === activeTabId)
+  const safeTabs = tabs || []
+  const safeLinks = links || []
+  const activeTab = safeTabs.find(t => t.id === activeTabId)
 
   const handleAddLink = async (data) => {
     if (editingLink) {
@@ -44,7 +46,6 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
 
   return (
     <div className="flex-1 min-h-[100dvh]">
-      {/* Header */}
       <header className="sticky top-0 z-30 glass border-b border-white/[0.06] px-4 sm:px-8 py-3">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
@@ -59,7 +60,7 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
                 {activeTab ? activeTab.name : 'All Links'}
               </h1>
               <p className="text-[11px] text-zinc-500">
-                {links.length} {links.length === 1 ? 'link' : 'links'}
+                {safeLinks.length} {safeLinks.length === 1 ? 'link' : 'links'}
               </p>
             </div>
           </div>
@@ -73,13 +74,11 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
           </button>
         </div>
 
-        {/* Search */}
         <div className="mt-3">
           <SearchBar value={search} onChange={setSearch} />
         </div>
       </header>
 
-      {/* Tab pills (mobile + desktop below header) */}
       <div className="px-4 sm:px-8 pt-4">
         <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
           <button
@@ -93,7 +92,7 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
             <Stack size={12} weight="bold" className="inline mr-1" />
             All
           </button>
-          {tabs.map(tab => (
+          {safeTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTabId(tab.id)}
@@ -114,13 +113,12 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
         </div>
       </div>
 
-      {/* Links grid */}
       <main className="px-4 sm:px-8 py-4 pb-24 sm:pb-8">
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {Array.from({ length: 4 }).map((_, i) => <LinkSkeleton key={i} />)}
           </div>
-        ) : links.length === 0 ? (
+        ) : safeLinks.length === 0 ? (
           <EmptyState
             title={search ? 'No matching links' : 'No links yet'}
             subtitle={search ? 'Try a different search term' : 'Add your first link to get started'}
@@ -130,7 +128,7 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
         ) : (
           <motion.div layout className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <AnimatePresence mode="popLayout">
-              {links.map((link, i) => (
+              {safeLinks.map((link, i) => (
                 <LinkCard
                   key={link.id}
                   link={link}
@@ -150,7 +148,7 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
         onClose={() => { setModalOpen(false); setEditingLink(null) }}
         onSubmit={handleAddLink}
         initial={editingLink}
-        tabs={tabs}
+        tabs={safeTabs}
       />
     </div>
   )
