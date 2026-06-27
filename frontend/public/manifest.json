@@ -1,0 +1,10 @@
+{
+  "name": "LinkKeep",
+  "short_name": "LinkKeep",
+  "description": "Premium Link Manager",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#6366f1",
+  "icons": []
+}

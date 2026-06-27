@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    environment:
+      - JWT_SECRET=lk-v2-super-secret-2026
+      - DATABASE_URL=sqlite:////data/linkkeep.db
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    networks:
+      - linkkeep-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "9091:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - linkkeep-net
+
+networks:
+  linkkeep-net:
+    driver: bridge
