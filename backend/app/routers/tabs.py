@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
+from pydantic import BaseModel
 
 from app.database import get_db
 from app.models import User, Tab, Link
@@ -51,6 +52,21 @@ def update_tab(tab_id: int, data: TabUpdate, user: User = Depends(_get_current_u
     out = TabOut.model_validate(tab)
     out.link_count = db.query(Link).filter(Link.tab_id == tab.id).count()
     return out
+
+
+class ReorderItem(BaseModel):
+    id: int
+    sort_order: int
+
+
+@router.post("/reorder")
+def reorder_tabs(items: List[ReorderItem], user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    for item in items:
+        tab = db.query(Tab).filter(Tab.id == item.id, Tab.user_id == user.id).first()
+        if tab:
+            tab.sort_order = item.sort_order
+    db.commit()
+    return {"status": "ok"}
 
 
 @router.delete("/{tab_id}", status_code=204)

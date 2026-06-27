@@ -1,5 +1,6 @@
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from './hooks/useAuth'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -7,9 +8,11 @@ import Favorites from './pages/Favorites'
 import Settings from './pages/Settings'
 import Sidebar from './components/Sidebar'
 import BottomNav from './components/BottomNav'
+import { ToastContainer } from './components/Toast'
+import { ConfirmModal } from './components/ConfirmModal'
 import { useTabs } from './hooks/useTabs'
 import { api } from './lib/api'
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 
 export default function App() {
   const { token, user, logout } = useAuth()
@@ -17,20 +20,22 @@ export default function App() {
   const location = useLocation()
   const [activeTabId, setActiveTabId] = useState(null)
 
-  // Sync tabs for sidebar
   const { tabs, create: createTab, remove: deleteTab, refresh: refreshTabs } = useTabs(token)
 
-  // Listen for auth-expired events
   useEffect(() => {
     const handler = () => logout()
     window.addEventListener('auth-expired', handler)
     return () => window.removeEventListener('auth-expired', handler)
   }, [logout])
 
-  if (!token) return <Login />
+  if (!token) return (
+    <>
+      <Login />
+      <ToastContainer />
+    </>
+  )
 
   const handleDeleteTab = async (id) => {
-    if (!confirm('Delete this tab and all its links?')) return
     await api.deleteTab(id)
     await refreshTabs()
     if (activeTabId === id) setActiveTabId(null)
@@ -38,7 +43,6 @@ export default function App() {
 
   return (
     <div className="flex min-h-[100dvh] bg-zinc-950 text-zinc-100">
-      {/* Desktop sidebar */}
       <Sidebar
         tabs={tabs || []}
         activeTabId={activeTabId}
@@ -48,28 +52,39 @@ export default function App() {
         collapsed={false}
       />
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <Dashboard
-                token={token}
-                user={user}
-                onNavigate={navigate}
-                initialTabId={activeTabId}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="flex-1 flex flex-col min-w-0"
+          >
+            <Routes location={location}>
+              <Route
+                path="/"
+                element={
+                  <Dashboard
+                    token={token}
+                    user={user}
+                    onNavigate={navigate}
+                    initialTabId={activeTabId}
+                  />
+                }
               />
-            }
-          />
-          <Route path="/all" element={<Dashboard token={token} user={user} onNavigate={navigate} />} />
-          <Route path="/favorites" element={<Favorites token={token} />} />
-          <Route path="/settings" element={<Settings user={user} />} />
-        </Routes>
+              <Route path="/all" element={<Dashboard token={token} user={user} onNavigate={navigate} />} />
+              <Route path="/favorites" element={<Favorites token={token} />} />
+              <Route path="/settings" element={<Settings user={user} />} />
+            </Routes>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
-      {/* Mobile bottom nav */}
       <BottomNav activePath={location.pathname} onNavigate={navigate} />
+      <ToastContainer />
+      <ConfirmModal />
     </div>
   )
 }

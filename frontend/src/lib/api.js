@@ -65,4 +65,21 @@ export const api = {
 
   // Stats
   getStats: () => request('/stats'),
+
+  // Settings
+  changePassword: (currentPassword, newPassword) =>
+    request('/settings/password', { method: 'PUT', body: { current_password: currentPassword, new_password: newPassword } }),
+  changeUsername: (newUsername) =>
+    request('/settings/username', { method: 'PUT', body: { new_username: newUsername } }),
+  exportData: () => request('/settings/export'),
+  importData: (data) => request('/settings/import', { method: 'POST', body: data }),
+  deleteAccount: () => request('/settings/account', { method: 'DELETE' }),
+  exportHtml: () => `${API_URL}/settings/export-html`,
+
+  // Reorder
+  reorderTabs: (items) => request('/tabs/reorder', { method: 'POST', body: items }),
+  reorderLinks: (items) => request('/links/reorder', { method: 'POST', body: items }),
+
+  // Duplicates
+  findDuplicates: () => request('/links/duplicates'),
 }

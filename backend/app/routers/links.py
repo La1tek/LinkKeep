@@ -4,8 +4,17 @@ from typing import List, Optional
 
 from app.database import get_db
 from app.models import User, Link, Tab
-from app.schemas import LinkCreate, LinkUpdate, LinkOut
+from app.schemas import LinkCreate, LinkUpdate, LinkOut, TabCreate, TabUpdate
 from app.routers.auth import _get_current_user
+
+
+from pydantic import BaseModel
+
+
+class ReorderItem(BaseModel):
+    id: int
+    sort_order: int
+    tab_id: Optional[int] = None
 
 router = APIRouter(prefix="/api/links", tags=["links"])
 
@@ -85,3 +94,31 @@ def toggle_favorite(link_id: int, user: User = Depends(_get_current_user), db: S
     db.commit()
     db.refresh(link)
     return link
+
+
+@router.post("/reorder")
+def reorder_links(items: List[ReorderItem], user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    for item in items:
+        link = db.query(Link).filter(Link.id == item.id, Link.user_id == user.id).first()
+        if link:
+            link.sort_order = item.sort_order
+            if item.tab_id is not None:
+                tab = db.query(Tab).filter(Tab.id == item.tab_id, Tab.user_id == user.id).first()
+                if tab:
+                    link.tab_id = item.tab_id
+    db.commit()
+    return {"status": "ok"}
+
+
+@router.get("/duplicates")
+def find_duplicates(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    links = db.query(Link).filter(Link.user_id == user.id).all()
+    seen = {}
+    dups = []
+    for l in links:
+        url_norm = l.url.rstrip('/').lower().replace('www.', '')
+        if url_norm in seen:
+            dups.append({"url": l.url, "links": [seen[url_norm], {"id": l.id, "title": l.title}]})
+        else:
+            seen[url_norm] = {"id": l.id, "title": l.title}
+    return {"duplicates": dups, "count": len(dups)}

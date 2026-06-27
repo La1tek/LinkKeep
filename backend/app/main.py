@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine, SessionLocal
-from app.routers import auth, tabs, links, metadata, stats
+from app.routers import auth, tabs, links, metadata, stats, settings
 
 
 @asynccontextmanager
@@ -27,6 +27,7 @@ app.include_router(tabs.router)
 app.include_router(links.router)
 app.include_router(metadata.router)
 app.include_router(stats.router)
+app.include_router(settings.router)
 
 
 @app.get("/api/health")
