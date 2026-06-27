@@ -1,16 +1,15 @@
 import { motion } from 'framer-motion'
-import { Plus, X, FolderSimple } from '@phosphor-icons/react'
+import { Plus, X, FolderSimple, GearSix, SignOut } from '@phosphor-icons/react'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
-const TAB_ICONS = [
-  'FolderSimple', 'BookmarkSimple', 'Star', 'Code', 'Palette',
-  'ShoppingCart', 'BookOpen', 'GameController', 'MusicNote', 'Camera',
-]
+const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4']
 
-export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, onDeleteTab, collapsed }) {
+export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, onDeleteTab, collapsed, onLogout }) {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState('#6366f1')
+  const navigate = useNavigate()
   const safeTabs = tabs || []
 
   const handleCreate = (e) => {
@@ -26,6 +25,7 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
 
   return (
     <aside className="hidden sm:flex flex-col w-60 shrink-0 border-r border-white/[0.06] h-[100dvh] sticky top-0">
+      {/* Logo */}
       <div className="px-5 py-5 flex items-center gap-2.5">
         <div className="h-8 w-8 rounded-xl bg-accent-600 flex items-center justify-center">
           <FolderSimple size={18} weight="fill" className="text-white" />
@@ -33,6 +33,7 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
         <span className="text-base font-bold tracking-tight text-zinc-100">LinkKeep</span>
       </div>
 
+      {/* Tabs */}
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
         {safeTabs.map(tab => {
           const active = tab.id === activeTabId
@@ -77,7 +78,7 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
             />
             <div className="flex items-center gap-2">
               <label className="text-[10px] text-zinc-500">Color:</label>
-              {['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4'].map(c => (
+              {COLORS.map(c => (
                 <button
                   key={c}
                   type="button"
@@ -102,7 +103,27 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
         )}
       </div>
 
-      <div className="px-5 py-4 border-t border-white/[0.06]">
+      {/* Bottom nav links */}
+      <div className="px-3 py-2 border-t border-white/[0.06] space-y-0.5">
+        <button
+          onClick={() => navigate('/settings')}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-zinc-400 hover:bg-white/[0.03] hover:text-zinc-200 transition-all"
+        >
+          <GearSix size={16} />
+          <span>Settings</span>
+        </button>
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-zinc-500 hover:text-red-400 hover:bg-red-500/5 transition-all"
+          >
+            <SignOut size={16} />
+            <span>Sign Out</span>
+          </button>
+        )}
+      </div>
+
+      <div className="px-5 py-3 border-t border-white/[0.06]">
         <p className="text-[10px] text-zinc-600 font-mono">LinkKeep v2.1</p>
       </div>
     </aside>
