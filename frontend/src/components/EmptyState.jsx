@@ -15,15 +15,11 @@ export default function EmptyState({ icon, title, subtitle, actionLabel, onActio
           {icon || <StackSimple size={40} weight="light" className="text-accent-400" />}
         </div>
       </div>
-      <h3 className="text-lg font-semibold tracking-tight text-zinc-200">{title}</h3>
-      {subtitle && (
-        <p className="mt-2 text-sm text-zinc-500 max-w-sm">{subtitle}</p>
-      )}
+      <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>{title}</h3>
+      {subtitle && <p className="mt-2 text-sm max-w-sm" style={{ color: 'var(--text-tertiary)' }}>{subtitle}</p>}
       {actionLabel && onAction && (
-        <button
-          onClick={onAction}
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-accent-600 px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-accent-500 active:scale-[0.98]"
-        >
+        <button onClick={onAction}
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-accent-600 px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-accent-500 active:scale-[0.98]">
           <Plus size={16} weight="bold" />
           {actionLabel}
         </button>

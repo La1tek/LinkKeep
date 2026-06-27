@@ -64,7 +64,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-[100dvh] bg-zinc-950 text-zinc-100">
+    <div className="flex min-h-[100dvh]" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       <Sidebar
         tabs={tabs || []}
         activeTabId={activeTabId}
@@ -88,14 +88,7 @@ export default function App() {
             <Routes location={location}>
               <Route
                 path="/"
-                element={
-                  <Dashboard
-                    token={token}
-                    user={user}
-                    onNavigate={navigate}
-                    initialTabId={activeTabId}
-                  />
-                }
+                element={<Dashboard token={token} user={user} onNavigate={navigate} initialTabId={activeTabId} />}
               />
               <Route path="/all" element={<Dashboard token={token} user={user} onNavigate={navigate} />} />
               <Route path="/favorites" element={<Favorites token={token} />} />

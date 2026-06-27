@@ -1,12 +1,5 @@
-import { motion } from 'framer-motion'
-
 export default function Skeleton({ className = '' }) {
-  return (
-    <div
-      className={`shimmer-bg animate-shimmer rounded-xl bg-white/[0.04] ${className}`}
-      style={{ backgroundSize: '1000px 100%' }}
-    />
-  )
+  return <div className={`shimmer-bg animate-shimmer rounded-xl ${className}`} style={{ background: 'var(--bg-tertiary)' }} />
 }
 
 export function LinkSkeleton() {
@@ -21,8 +14,4 @@ export function LinkSkeleton() {
       </div>
     </div>
   )
-}
-
-export function TabSkeleton() {
-  return <Skeleton className="h-10 w-24 rounded-xl" />
 }

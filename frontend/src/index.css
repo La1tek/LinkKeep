@@ -3,55 +3,59 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Light theme (default) */
+    --bg-primary: #fafafa;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f4f4f5;
+    --bg-hover: rgba(0, 0, 0, 0.04);
+    --bg-glass: rgba(255, 255, 255, 0.72);
+    --border-glass: rgba(0, 0, 0, 0.07);
+    --border-subtle: rgba(0, 0, 0, 0.06);
+    --border-input: rgba(0, 0, 0, 0.1);
+    --text-primary: #18181b;
+    --text-secondary: #3f3f46;
+    --text-tertiary: #71717a;
+    --text-muted: #a1a1aa;
+    --text-placeholder: #a1a1aa;
+    --shadow-glass: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 3px rgba(0,0,0,0.04);
+    --shimmer-color: rgba(0, 0, 0, 0.04);
+  }
+
+  html.dark {
+    /* Dark theme */
+    --bg-primary: #09090b;
+    --bg-secondary: #18181b;
+    --bg-tertiary: rgba(255, 255, 255, 0.03);
+    --bg-hover: rgba(255, 255, 255, 0.04);
+    --bg-glass: rgba(255, 255, 255, 0.03);
+    --border-glass: rgba(255, 255, 255, 0.08);
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-input: rgba(255, 255, 255, 0.08);
+    --text-primary: #f4f4f5;
+    --text-secondary: #d4d4d8;
+    --text-tertiary: #a1a1aa;
+    --text-muted: #71717a;
+    --text-placeholder: #52525b;
+    --shadow-glass: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --shimmer-color: rgba(255, 255, 255, 0.06);
+  }
+
   * {
     -webkit-tap-highlight-color: transparent;
   }
 
-  html { color-scheme: dark; }
+  html.dark { color-scheme: dark; }
   html:not(.dark) { color-scheme: light; }
 
   body {
     font-family: 'Geist', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background-color 0.2s, color 0.2s;
   }
-
-  /* Default (dark) */
-  body { @apply bg-zinc-950 text-zinc-100; }
-  .glass {
-    background: rgba(255, 255, 255, 0.03);
-    border-color: rgba(255, 255, 255, 0.08) !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  }
-
-  /* Light theme — when html does NOT have .dark */
-  html:not(.dark) body { @apply bg-zinc-50 text-zinc-900; }
-
-  html:not(.dark) .glass {
-    background: rgba(255, 255, 255, 0.7) !important;
-    border-color: rgba(0, 0, 0, 0.07) !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 3px rgba(0,0,0,0.04);
-  }
-
-  html:not(.dark) .text-zinc-100 { color: #18181b !important; }
-  html:not(.dark) .text-zinc-200 { color: #27272a !important; }
-  html:not(.dark) .text-zinc-300 { color: #3f3f46 !important; }
-  html:not(.dark) .text-zinc-400 { color: #52525b !important; }
-  html:not(.dark) .text-zinc-500 { color: #71717a !important; }
-  html:not(.dark) .text-zinc-600 { color: #a1a1aa !important; }
-  html:not(.dark) .text-zinc-700 { color: #d4d4d8 !important; }
-
-  html:not(.dark) .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.025) !important; }
-  html:not(.dark) .bg-white\/\[0\.05\] { background-color: rgba(0,0,0,0.035) !important; }
-  html:not(.dark) .hover\:bg-white\/5:hover { background-color: rgba(0,0,0,0.03) !important; }
-  html:not(.dark) .hover\:bg-white\/\[0\.02\]:hover { background-color: rgba(0,0,0,0.025) !important; }
-  html:not(.dark) .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(0,0,0,0.03) !important; }
-
-  html:not(.dark) .border-white\/\[0\.06\] { border-color: rgba(0,0,0,0.07) !important; }
-  html:not(.dark) .border-white\/\[0\.08\] { border-color: rgba(0,0,0,0.08) !important; }
-  html:not(.dark) .divide-white\/\[0\.04\] > * { border-color: rgba(0,0,0,0.06) !important; }
-
-  html:not(.dark) .placeholder-zinc-600::placeholder { color: #a1a1aa !important; }
 
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -60,14 +64,44 @@
 
 @layer components {
   .glass {
-    @apply backdrop-blur-xl border;
-    background: rgba(255, 255, 255, 0.03);
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    box-shadow: var(--shadow-glass);
   }
 
+  .surface {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .surface-hover:hover {
+    background: var(--bg-hover);
+  }
+
+  .input-base {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-input);
+    color: var(--text-primary);
+    transition: border-color 0.15s;
+  }
+  .input-base::placeholder { color: var(--text-placeholder); }
+  .input-base:focus {
+    border-color: rgba(99, 102, 241, 0.5);
+    box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2);
+    outline: none;
+  }
+
+  .text-primary { color: var(--text-primary); }
+  .text-secondary { color: var(--text-secondary); }
+  .text-tertiary { color: var(--text-tertiary); }
+  .text-muted { color: var(--text-muted); }
+
+  .border-subtle { border-color: var(--border-subtle); }
+
   .shimmer-bg {
-    background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0) 100%);
+    background: linear-gradient(90deg, transparent 0%, var(--shimmer-color) 50%, transparent 100%);
     background-size: 1000px 100%;
   }
 }

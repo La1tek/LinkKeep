@@ -8,9 +8,7 @@ export const useToast = create((set, get) => ({
   show: (message, type = 'info', duration = 3000) => {
     const id = ++toastId
     set({ toasts: [...get().toasts, { id, message, type, duration }] })
-    if (duration > 0) {
-      setTimeout(() => get().remove(id), duration)
-    }
+    if (duration > 0) setTimeout(() => get().remove(id), duration)
     return id
   },
   success: (msg, d) => get().show(msg, 'success', d),
@@ -19,16 +17,11 @@ export const useToast = create((set, get) => ({
   remove: (id) => set({ toasts: get().toasts.filter(t => t.id !== id) }),
 }))
 
-const icons = {
-  success: CheckCircle,
-  error: Warning,
-  info: Info,
-}
-
-const colors = {
-  success: 'text-emerald-400 border-emerald-500/20',
-  error: 'text-red-400 border-red-500/20',
-  info: 'text-accent-400 border-accent-500/20',
+const icons = { success: CheckCircle, error: Warning, info: Info }
+const borderColors = {
+  success: 'border-emerald-500/20',
+  error: 'border-red-500/20',
+  info: 'border-accent-500/20',
 }
 
 export function ToastContainer() {
@@ -40,15 +33,10 @@ export function ToastContainer() {
       {toasts.map(t => {
         const Icon = icons[t.type] || Info
         return (
-          <div
-            key={t.id}
-            className={`glass border ${colors[t.type] || colors.info} rounded-xl px-4 py-2.5 flex items-center gap-2.5 max-w-sm animate-slide-up pointer-events-auto shadow-lg`}
-          >
-            <Icon size={16} weight="fill" className="shrink-0" />
-            <span className="text-sm text-zinc-200 flex-1">{t.message}</span>
-            <button onClick={() => remove(t.id)} className="text-zinc-500 hover:text-zinc-300 shrink-0">
-              <X size={14} />
-            </button>
+          <div key={t.id} className={`glass border ${borderColors[t.type] || borderColors.info} rounded-xl px-4 py-2.5 flex items-center gap-2.5 max-w-sm animate-slide-up pointer-events-auto shadow-lg`}>
+            <Icon size={16} weight="fill" className="shrink-0" style={{ color: t.type === 'success' ? '#34d399' : t.type === 'error' ? '#f87171' : '#818cf8' }} />
+            <span className="text-sm flex-1" style={{ color: 'var(--text-secondary)' }}>{t.message}</span>
+            <button onClick={() => remove(t.id)} style={{ color: 'var(--text-muted)' }} className="shrink-0"><X size={14} /></button>
           </div>
         )
       })}

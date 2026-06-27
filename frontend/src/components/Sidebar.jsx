@@ -24,16 +24,14 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
   if (collapsed) return null
 
   return (
-    <aside className="hidden sm:flex flex-col w-60 shrink-0 border-r border-white/[0.06] h-[100dvh] sticky top-0">
-      {/* Logo */}
+    <aside className="hidden sm:flex flex-col w-60 shrink-0 h-[100dvh] sticky top-0" style={{ borderRight: '1px solid var(--border-subtle)' }}>
       <div className="px-5 py-5 flex items-center gap-2.5">
         <div className="h-8 w-8 rounded-xl bg-accent-600 flex items-center justify-center">
           <FolderSimple size={18} weight="fill" className="text-white" />
         </div>
-        <span className="text-base font-bold tracking-tight text-zinc-100">LinkKeep</span>
+        <span className="text-base font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>LinkKeep</span>
       </div>
 
-      {/* Tabs */}
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
         {safeTabs.map(tab => {
           const active = tab.id === activeTabId
@@ -42,23 +40,20 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
               <motion.button
                 layout
                 onClick={() => onSelectTab(tab.id)}
-                className={`flex-1 flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all ${
-                  active
-                    ? 'bg-accent-500/10 text-accent-300'
-                    : 'text-zinc-400 hover:bg-white/[0.03] hover:text-zinc-200'
-                }`}
+                className="flex-1 flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover"
+                style={{
+                  background: active ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                  color: active ? '#818cf8' : 'var(--text-tertiary)',
+                }}
               >
-                <div
-                  className="h-2 w-2 rounded-full shrink-0"
-                  style={{ backgroundColor: tab.color || '#6366f1' }}
-                />
+                <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: tab.color || '#6366f1' }} />
                 <span className="truncate">{tab.name}</span>
-                <span className="text-[10px] text-zinc-600 ml-auto">{tab.link_count}</span>
+                <span className="text-[10px] ml-auto" style={{ color: 'var(--text-muted)' }}>{tab.link_count}</span>
               </motion.button>
               <button
                 onClick={() => onDeleteTab(tab.id)}
-                className="absolute right-2 opacity-0 group-hover:opacity-100 p-1 text-zinc-600 hover:text-red-400 transition-all"
-                title="Delete tab"
+                className="absolute right-2 opacity-0 group-hover:opacity-100 p-1 transition-all hover:text-red-400"
+                style={{ color: 'var(--text-muted)' }}
               >
                 <X size={12} />
               </button>
@@ -67,22 +62,19 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
         })}
 
         {creating ? (
-          <form onSubmit={handleCreate} className="px-2 py-2 space-y-2 glass rounded-xl">
+          <form onSubmit={handleCreate} className="glass rounded-xl px-3 py-2.5 space-y-2">
             <input
               autoFocus
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onBlur={() => { if (!newName) setCreating(false) }}
               placeholder="Tab name..."
-              className="w-full bg-white/[0.05] border border-accent-500/30 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 outline-none"
+              className="input-base w-full rounded-lg px-3 py-2 text-sm outline-none"
             />
             <div className="flex items-center gap-2">
-              <label className="text-[10px] text-zinc-500">Color:</label>
+              <label className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Color:</label>
               {COLORS.map(c => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setNewColor(c)}
+                <button key={c} type="button" onClick={() => setNewColor(c)}
                   className={`h-4 w-4 rounded-full transition-transform ${newColor === c ? 'scale-125 ring-2 ring-white/20' : ''}`}
                   style={{ backgroundColor: c }}
                 />
@@ -95,7 +87,8 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
         ) : (
           <button
             onClick={() => setCreating(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.03] transition-all"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm surface-hover transition-all"
+            style={{ color: 'var(--text-muted)' }}
           >
             <Plus size={14} weight="bold" />
             <span>New Tab</span>
@@ -103,11 +96,11 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
         )}
       </div>
 
-      {/* Bottom nav links */}
-      <div className="px-3 py-2 border-t border-white/[0.06] space-y-0.5">
+      <div className="px-3 py-2 space-y-0.5" style={{ borderTop: '1px solid var(--border-subtle)' }}>
         <button
           onClick={() => navigate('/settings')}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-zinc-400 hover:bg-white/[0.03] hover:text-zinc-200 transition-all"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm surface-hover transition-all"
+          style={{ color: 'var(--text-tertiary)' }}
         >
           <GearSix size={16} />
           <span>Settings</span>
@@ -115,7 +108,8 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
         {onLogout && (
           <button
             onClick={onLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-zinc-500 hover:text-red-400 hover:bg-red-500/5 transition-all"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all hover:text-red-400"
+            style={{ color: 'var(--text-muted)' }}
           >
             <SignOut size={16} />
             <span>Sign Out</span>
@@ -123,8 +117,8 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
         )}
       </div>
 
-      <div className="px-5 py-3 border-t border-white/[0.06]">
-        <p className="text-[10px] text-zinc-600 font-mono">LinkKeep v2.1</p>
+      <div className="px-5 py-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+        <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>LinkKeep v2.1</p>
       </div>
     </aside>
   )
