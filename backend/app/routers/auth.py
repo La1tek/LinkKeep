@@ -1,13 +1,35 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 
 from app.database import get_db
 from app.models import User
 from app.schemas import UserCreate, UserOut, Token
-from app.auth import get_password_hash, verify_password, create_access_token
+from app.auth import get_password_hash, verify_password, create_access_token, decode_token
+from app.config import JWT_SECRET, JWT_ALGORITHM
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+
+def _get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    cred_exc = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = decode_token(token)
+        username: str = payload.get("sub")
+        if username is None:
+            raise cred_exc
+    except Exception:
+        raise cred_exc
+    user = db.query(User).filter(User.username == username).first()
+    if user is None:
+        raise cred_exc
+    return user
 
 
 @router.post("/register", response_model=UserOut, status_code=201)
@@ -33,32 +55,4 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(_get_current_user)):
-    return user
-
-
-# ── shared dependency (imported by other routers) ──
-
-from fastapi import Depends
-from fastapi.security import OAuth2PasswordBearer
-from app.auth import decode_token
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
-
-
-def _get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
-    cred_exc = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = decode_token(token)
-        username: str = payload.get("sub")
-        if username is None:
-            raise cred_exc
-    except Exception:
-        raise cred_exc
-    user = db.query(User).filter(User.username == username).first()
-    if user is None:
-        raise cred_exc
     return user

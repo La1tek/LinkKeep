@@ -26,7 +26,7 @@ class Tab(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(128), nullable=False)
     icon = Column(String(64), default="FolderSimple")
-    color = Column(String(16), default("#6366f1")
+    color = Column(String(16), default="#6366f1")
     sort_order = Column(Integer, default=0)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
