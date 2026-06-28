@@ -24,7 +24,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchEnd}
-      className={`group glass rounded-2xl p-4 transition-all surface-hover ${link.is_pinned ? 'ring-1 ring-accent-500/30' : ''} ${selected ? 'ring-2 ring-accent-500' : ''}`}
+      className={`group glass rounded-2xl p-4 transition-all surface-hover ${link.is_pinned ? 'ring-1 ring-accent-500/30' : ''} ${selected ? 'ring-2 ring-accent-500' : ''}`} style={{ overflow: 'visible' }}
     >
       {/* Pinned indicator */}
       {link.is_pinned && (

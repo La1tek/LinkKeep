@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, SpinnerGap } from '@phosphor-icons/react'
 import { useState, useEffect } from 'react'
 
-export default function LinkModal({ open, onClose, onSubmit, initial, tabs }) {
+export default function LinkModal({ open, onClose, onSubmit, initial, tabs, defaultTabId }) {
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
   const [description, setDescription] = useState('')
@@ -17,7 +17,7 @@ export default function LinkModal({ open, onClose, onSubmit, initial, tabs }) {
       setTitle(initial.title || ''); setUrl(initial.url || ''); setDescription(initial.description || '')
       setTabId(initial.tab_id || ''); setTags((initial.tags || []).join(', ')); setAutoFetched(true)
     } else {
-      setTitle(''); setUrl(''); setDescription(''); setTabId(''); setTags(''); setAutoFetched(false)
+      setTitle(''); setUrl(''); setDescription(''); setTabId(defaultTabId || ''); setTags(''); setAutoFetched(false)
     }
   }, [initial, open])
 

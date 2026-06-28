@@ -300,7 +300,7 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
         )}
       </AnimatePresence>
 
-      <main className="px-4 sm:px-8 py-4 pb-24 sm:pb-8 overflow-hidden">
+      <main className="px-4 sm:px-8 py-4 pb-24 sm:pb-8" style={{ overflow: 'visible' }}>
         <AnimatePresence custom={direction} mode="wait">
           <motion.div
             key={showUngrouped ? 'ungrouped' : (activeTabId || 'all')}
@@ -341,7 +341,7 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
 
       <button onClick={() => { setEditingLink(null); setModalOpen(true) }} className="sm:hidden fixed bottom-20 right-4 z-40 h-14 w-14 bg-accent-600 text-white rounded-2xl shadow-lg shadow-accent-600/30 flex items-center justify-center active:scale-90 transition-transform"><Plus size={24} weight="bold" /></button>
 
-      <LinkModal open={modalOpen} onClose={() => { setModalOpen(false); setEditingLink(null) }} onSubmit={handleAddLink} initial={editingLink} tabs={safeTabs} />
+      <LinkModal open={modalOpen} onClose={() => { setModalOpen(false); setEditingLink(null) }} onSubmit={handleAddLink} initial={editingLink} tabs={safeTabs} defaultTabId={showUngrouped ? '' : (activeTabId || '')} />
 
       <TabEditModal tab={editTabModal} onClose={() => setEditTabModal(null)} onSave={async (data) => { await updateTab(editTabModal.id, data); setEditTabModal(null); toast.success('Group updated') }} onDelete={(t) => { setEditTabModal(null); refresh() }} />
 
