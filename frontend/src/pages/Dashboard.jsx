@@ -1,6 +1,6 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Stack, FolderSimple, PushPin, CheckSquare, X, Trash, ArrowsOutSimple, MagnifyingGlass } from '@phosphor-icons/react'
+import { Plus, Stack, FolderSimple, PushPin, CheckSquare, X, Trash, ArrowsOutSimple, MagnifyingGlass, CaretRight } from '@phosphor-icons/react'
 import { useTabStore } from '../hooks/useTabStore'
 import { useLinks } from '../hooks/useLinks'
 import { api } from '../lib/api'
@@ -12,9 +12,36 @@ import EmptyState from '../components/EmptyState'
 import { LinkSkeleton } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
 import { openConfirm } from '../components/ConfirmModal'
+import AnimatedCounter from '../components/AnimatedCounter'
 
 const COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#ef4444']
 const TAB_ICONS = ['FolderSimple', 'BookmarkSimple', 'Briefcase', 'Code', 'BookOpen', 'ShoppingCart', 'MusicNote', 'GameController']
+
+const staggerContainer = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.05 }
+  }
+}
+
+const staggerItem = {
+  hidden: { opacity: 0, y: 12, scale: 0.98 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } }
+}
+
+function throttle(fn, ms) {
+  let last = 0
+  let rafId = null
+  return (...args) => {
+    const now = performance.now()
+    if (now - last >= ms) {
+      last = now
+      fn(...args)
+    } else if (!rafId) {
+      rafId = requestAnimationFrame(() => { last = now; rafId = null; fn(...args) })
+    }
+  }
+}
 
 export default function Dashboard({ token, user, onNavigate, initialTabId }) {
   const { tabs, create: createTab, update: updateTab, remove: deleteTab, refresh: refreshTabs } = useTabStore()
@@ -36,6 +63,26 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
   const [pullDistance, setPullDistance] = useState(0)
   const [pulling, setPulling] = useState(false)
   const touchStartY = useRef(0)
+
+  // Adaptive header state
+  const [headerScrolled, setHeaderScrolled] = useState(false)
+  const [searchCollapsed, setSearchCollapsed] = useState(false)
+  const [searchExpanded, setSearchExpanded] = useState(false)
+  const parallaxRef = useRef(0)
+  const mainRef = useRef(null)
+
+  // Throttled scroll handler
+  useEffect(() => {
+    const onScroll = throttle(() => {
+      const scrollY = window.scrollY
+      setHeaderScrolled(scrollY > 40)
+      setSearchCollapsed(scrollY > 80 && !searchExpanded)
+      parallaxRef.current = scrollY
+    }, 16)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [searchExpanded])
+
   const toast = useToast()
 
   const safeTabs = tabs || []
@@ -186,19 +233,28 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
 
   const headerTitle = showUngrouped ? 'Ungrouped' : (activeTab ? activeTab.name : 'All Links')
 
+  // Breadcrumb
+  const breadcrumbItems = useMemo(() => {
+    const items = [{ label: 'All Links', onClick: () => switchTab(null) }]
+    if (showUngrouped) items.push({ label: 'Ungrouped' })
+    else if (activeTab) items.push({ label: activeTab.name })
+    return items
+  }, [showUngrouped, activeTab])
+
   const renderLink = (link, i) => (
-    <LinkCard
-      key={link.id}
-      link={link}
-      index={i}
-      selectionMode={selectionMode}
-      selected={selectedIds.includes(link.id)}
-      onSelect={toggleSelect}
-      onEdit={handleEditLink}
-      onDelete={handleDeleteLink}
-      onToggleFav={handleToggleFav}
-      onTogglePin={handleTogglePin}
-    />
+    <motion.div key={link.id} variants={staggerItem}>
+      <LinkCard
+        link={link}
+        index={i}
+        selectionMode={selectionMode}
+        selected={selectedIds.includes(link.id)}
+        onSelect={toggleSelect}
+        onEdit={handleEditLink}
+        onDelete={handleDeleteLink}
+        onToggleFav={handleToggleFav}
+        onTogglePin={handleTogglePin}
+      />
+    </motion.div>
   )
 
   return (
@@ -206,6 +262,7 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      ref={mainRef}
     >
       {/* Pull indicator */}
       {pullDistance > 0 && (
@@ -217,39 +274,96 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
         </div>
       )}
 
-      <header className="sticky top-0 z-30 glass px-4 sm:px-8 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => onNavigate('/')} className="sm:hidden p-2 -ml-2 flex items-center gap-1.5" style={{ color: 'var(--text-tertiary)' }}>
-              <div className="h-6 w-6 rounded-lg bg-accent-600 flex items-center justify-center">
-                <FolderSimple size={13} weight="fill" className="text-white" />
+      <header className="sticky top-0 z-30 transition-all duration-300"
+        style={{
+          background: 'var(--bg-glass)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderBottom: '1px solid var(--border-subtle)',
+          boxShadow: headerScrolled ? '0 1px 12px rgba(0,0,0,0.06)' : 'none',
+          // Parallax gradient overlay
+          '--parallax-y': `${-(parallaxRef.current * 0.15)}px`,
+        }}
+      >
+        {/* Parallax gradient layer */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+          <div className="absolute -inset-4 opacity-0 sm:opacity-100 transition-opacity duration-300" style={{
+            background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(99,102,241,0.08), transparent 70%)',
+            transform: `translateY(${headerScrolled ? '-4px' : '0'})`,
+          }} />
+        </div>
+
+        <div className={`relative transition-all duration-300 ${headerScrolled ? 'px-4 sm:px-8 py-2' : 'px-4 sm:px-8 py-3'}`}>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <button onClick={() => onNavigate('/')} className="sm:hidden p-2 -ml-2 flex items-center gap-1.5" style={{ color: 'var(--text-tertiary)' }}>
+                <div className="h-6 w-6 rounded-lg bg-accent-600 flex items-center justify-center">
+                  <FolderSimple size={13} weight="fill" className="text-white" />
+                </div>
+              </button>
+              <div className="min-w-0">
+                <h1 className={`font-semibold tracking-tight truncate transition-all duration-300 ${headerScrolled ? 'text-sm' : 'text-base'}`} style={{ color: 'var(--text-primary)' }}>{headerTitle}</h1>
+                <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                  <AnimatedCounter value={processedLinks.length} /> {processedLinks.length === 1 ? 'link' : 'links'}
+                  {pinnedLinks.length > 0 && <span className="ml-2 inline-flex items-center gap-0.5"><PushPin size={9} weight="fill" /> <AnimatedCounter value={pinnedLinks.length} /></span>}
+                  {activeTag && <span className="text-accent-400 ml-1">#{activeTag}</span>}
+                </p>
               </div>
-            </button>
-            <div className="min-w-0">
-              <h1 className="text-base font-semibold tracking-tight truncate" style={{ color: 'var(--text-primary)' }}>{headerTitle}</h1>
-              <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                {processedLinks.length} {processedLinks.length === 1 ? 'link' : 'links'}
-                {pinnedLinks.length > 0 && <span className="ml-2 inline-flex items-center gap-0.5"><PushPin size={9} weight="fill" /> {pinnedLinks.length}</span>}
-                {activeTag && <span className="text-accent-400 ml-1">#{activeTag}</span>}
-              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="glass text-xs rounded-lg px-2.5 py-2 border-none outline-none cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <option value="newest">Newest</option><option value="oldest">Oldest</option><option value="az">A-Z</option><option value="za">Z-A</option>
+              </select>
+              <button onClick={() => setSelectionMode(!selectionMode)} className={`p-2 rounded-lg transition-colors ${selectionMode ? 'bg-accent-600 text-white' : ''}`} style={!selectionMode ? { color: 'var(--text-muted)' } : {}}><CheckSquare size={16} /></button>
+              <button onClick={() => { setEditingLink(null); setModalOpen(true) }} className="sm:hidden h-9 w-9 bg-accent-600 text-white rounded-xl active:scale-95 transition-all flex items-center justify-center"><Plus size={18} weight="bold" /></button>
+              <button onClick={() => { setEditingLink(null); setModalOpen(true) }} className="hidden sm:inline-flex items-center gap-1.5 bg-accent-600 text-white px-3.5 py-2 rounded-xl text-sm font-medium hover:bg-accent-500 active:scale-[0.98] transition-all"><Plus size={15} weight="bold" /><span>Add Link</span></button>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="glass text-xs rounded-lg px-2.5 py-2 border-none outline-none cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-              <option value="newest">Newest</option><option value="oldest">Oldest</option><option value="az">A-Z</option><option value="za">Z-A</option>
-            </select>
-            <button onClick={() => setSelectionMode(!selectionMode)} className={`p-2 rounded-lg transition-colors ${selectionMode ? 'bg-accent-600 text-white' : ''}`} style={!selectionMode ? { color: 'var(--text-muted)' } : {}}><CheckSquare size={16} /></button>
-            <button onClick={() => { setEditingLink(null); setModalOpen(true) }} className="sm:hidden h-9 w-9 bg-accent-600 text-white rounded-xl active:scale-95 transition-all flex items-center justify-center"><Plus size={18} weight="bold" /></button>
-            <button onClick={() => { setEditingLink(null); setModalOpen(true) }} className="hidden sm:inline-flex items-center gap-1.5 bg-accent-600 text-white px-3.5 py-2 rounded-xl text-sm font-medium hover:bg-accent-500 active:scale-[0.98] transition-all"><Plus size={15} weight="bold" /><span>Add Link</span></button>
+
+          {/* Search bar - collapses on scroll, expandable */}
+          <div className="mt-3 transition-all duration-300 overflow-hidden" style={{ maxHeight: searchCollapsed && !searchExpanded ? '0' : '60px', marginTop: searchCollapsed && !searchExpanded ? '0' : '12px', opacity: searchCollapsed && !searchExpanded ? 0 : 1 }}>
+            <SearchBar value={search} onChange={setSearch} placeholder="Search title, URL, description..." />
           </div>
+
+          {/* Collapsed search icon */}
+          {searchCollapsed && !searchExpanded && (
+            <button
+              onClick={() => setSearchExpanded(true)}
+              className="absolute right-16 sm:right-20 top-1/2 -translate-y-1/2 p-2 rounded-lg glass transition-all"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              <MagnifyingGlass size={16} />
+            </button>
+          )}
+
+          {/* Expandable search overlay when collapsed */}
+          <AnimatePresence>
+            {searchExpanded && searchCollapsed && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="absolute inset-x-0 top-full mt-1 px-4 sm:px-8 z-10"
+              >
+                <div className="glass rounded-xl p-2 shadow-lg" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                  <div className="flex items-center gap-2">
+                    <SearchBar value={search} onChange={(v) => setSearch(v)} placeholder="Search..." autoFocus />
+                    <button onClick={() => setSearchExpanded(false)} className="p-2 rounded-lg shrink-0" style={{ color: 'var(--text-muted)' }}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {allTags.length > 0 && !searchCollapsed && (
+            <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+              {activeTag && <button onClick={() => setActiveTag(null)} className="shrink-0 text-[10px] px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">Clear</button>}
+              {allTags.map(tag => <button key={tag} onClick={() => setActiveTag(activeTag === tag ? null : tag)} className="shrink-0 text-[10px] px-2.5 py-1 rounded-full border transition-all glass" style={{ color: 'var(--text-tertiary)', borderColor: activeTag === tag ? 'rgba(99,102,241,0.5)' : 'var(--border-subtle)', background: activeTag === tag ? 'rgba(99,102,241,0.15)' : '' }}>{tag}</button>)}
+            </div>
+          )}
         </div>
-        <div className="mt-3"><SearchBar value={search} onChange={setSearch} placeholder="Search title, URL, description..." /></div>
-        {allTags.length > 0 && (
-          <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-            {activeTag && <button onClick={() => setActiveTag(null)} className="shrink-0 text-[10px] px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">Clear</button>}
-            {allTags.map(tag => <button key={tag} onClick={() => setActiveTag(activeTag === tag ? null : tag)} className="shrink-0 text-[10px] px-2.5 py-1 rounded-full border transition-all glass" style={{ color: 'var(--text-tertiary)', borderColor: activeTag === tag ? 'rgba(99,102,241,0.5)' : 'var(--border-subtle)', background: activeTag === tag ? 'rgba(99,102,241,0.15)' : '' }}>{tag}</button>)}
-          </div>
-        )}
       </header>
 
       {/* Tab pills */}
@@ -273,13 +387,31 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
                 {tab.id !== null && <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tab.color || '#6366f1' }} />}
                 {tab.id === null && <Stack size={12} weight="bold" className="inline" />}
                 {tab.name}
-                {tab.id !== null && tab.link_count !== undefined && <span className="opacity-50">{tab.link_count}</span>}
+                {tab.id !== null && tab.link_count !== undefined && <span className="opacity-50"><AnimatedCounter value={tab.link_count} /></span>}
               </button>
             )
           })}
           <button onClick={() => setNewTabOpen(true)} className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1" style={{ color: 'var(--text-muted)', background: 'var(--bg-secondary)' }}><Plus size={12} weight="bold" />New</button>
         </div>
       </div>
+
+      {/* Breadcrumb */}
+      {breadcrumbItems.length > 1 && (
+        <div className="px-4 sm:px-8 py-2">
+          <nav className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {breadcrumbItems.map((item, i) => (
+              <span key={i} className="flex items-center gap-1">
+                {i > 0 && <CaretRight size={10} weight="bold" className="opacity-40" />}
+                {i < breadcrumbItems.length - 1 ? (
+                  <button onClick={item.onClick} className="transition-colors hover:text-accent-400 truncate max-w-[120px] sm:max-w-[200px]">{item.label}</button>
+                ) : (
+                  <span className="truncate max-w-[120px] sm:max-w-[200px]" style={{ color: 'var(--text-secondary)' }}>{item.label}</span>
+                )}
+              </span>
+            ))}
+          </nav>
+        </div>
+      )}
 
       {/* Bulk action bar */}
       <AnimatePresence>
@@ -313,9 +445,17 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
             className="space-y-3"
           >
             {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{Array.from({ length: 4 }).map((_, i) => <LinkSkeleton key={i} />)}</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {Array.from({ length: 4 }).map((_, i) => <LinkSkeleton key={i} index={i} />)}
+              </div>
             ) : processedLinks.length === 0 ? (
-              <EmptyState title={search ? 'No matching links' : 'No links yet'} subtitle={search ? 'Try a different search term' : 'Add your first link to get started'} actionLabel={search ? undefined : 'Add Link'} onAction={search ? undefined : () => setModalOpen(true)} />
+              <EmptyState
+                title={search ? 'No matching links' : 'No links yet'}
+                subtitle={search ? 'Try a different search term' : 'Add your first link to get started'}
+                actionLabel={search ? undefined : 'Add Link'}
+                onAction={search ? undefined : () => setModalOpen(true)}
+                illustration={search ? 'no-results' : 'no-links'}
+              />
             ) : (
               <>
                 {pinnedLinks.length > 0 && (
@@ -323,15 +463,15 @@ export default function Dashboard({ token, user, onNavigate, initialTabId }) {
                     <div className="text-[10px] font-medium uppercase tracking-wider flex items-center gap-1 px-1" style={{ color: 'var(--text-muted)' }}>
                       <PushPin size={10} weight="fill" /> Pinned
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-3" variants={staggerContainer} initial="hidden" animate="show">
                       {pinnedLinks.map((link, i) => renderLink(link, i))}
-                    </div>
+                    </motion.div>
                   </div>
                 )}
                 {normalLinks.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-3" variants={staggerContainer} initial="hidden" animate="show">
                     {normalLinks.map((link, i) => renderLink(link, i))}
-                  </div>
+                  </motion.div>
                 )}
               </>
             )}

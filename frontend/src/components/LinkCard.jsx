@@ -1,10 +1,106 @@
 import { Star, DotsThreeVertical, ArrowUpRight, Trash, PencilSimple, PushPin, PushPinSlash, NotePencil, Check } from '@phosphor-icons/react'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+
+function getDomain(url) {
+  try { return new URL(url).hostname.replace('www.', '') } catch { return url }
+}
+
+function formatDate(dateStr) {
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  } catch { return '' }
+}
+
+function InlineEdit({ value, onSave, onCancel, placeholder, className, multiline = false }) {
+  const [val, setVal] = useState(value)
+  const inputRef = useRef(null)
+  useEffect(() => {
+    inputRef.current?.focus()
+    if (inputRef.current && !multiline) inputRef.current.select()
+  }, [])
+
+  const save = () => {
+    const trimmed = val.trim()
+    if (trimmed && trimmed !== value) onSave(trimmed)
+    else onCancel()
+  }
+
+  if (multiline) {
+    return (
+      <textarea
+        ref={inputRef}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save() }
+          if (e.key === 'Escape') onCancel()
+        }}
+        className={`input-base w-full rounded-lg px-2 py-1 text-sm outline-none ${className || ''}`}
+        placeholder={placeholder}
+        rows={2}
+      />
+    )
+  }
+  return (
+    <input
+      ref={inputRef}
+      value={val}
+      onChange={(e) => setVal(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') save()
+        if (e.key === 'Escape') onCancel()
+      }}
+      className={`input-base w-full rounded-lg px-2 py-0.5 text-sm outline-none ${className || ''}`}
+      placeholder={placeholder}
+    />
+  )
+}
+
+function StatusDot({ link }) {
+  const [status, setStatus] = useState('checking')
+
+  useEffect(() => {
+    // New links show "checking" for 2 seconds, then "alive"
+    // All links default to "alive" since we don't have real checking
+    const timer = setTimeout(() => setStatus('alive'), 2000)
+    // Mark as alive immediately for existing links (created more than 2s ago)
+    if (link.created_at) {
+      const age = Date.now() - new Date(link.created_at).getTime()
+      if (age > 3000) {
+        clearTimeout(timer)
+        setStatus('alive')
+      }
+    }
+    return () => clearTimeout(timer)
+  }, [link.created_at])
+
+  const color = status === 'checking' ? 'var(--text-muted)' : '#22c55e'
+  const pulse = status === 'checking'
+
+  return (
+    <span className="inline-flex items-center justify-center shrink-0" style={{ width: 6, height: 6 }}>
+      <span
+        className="block rounded-full"
+        style={{
+          width: 6,
+          height: 6,
+          backgroundColor: color,
+          animation: pulse ? 'status-pulse 1.5s ease-in-out infinite' : 'none',
+        }}
+      />
+    </span>
+  )
+}
 
 export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onTogglePin, onSelect, selected, selectionMode, index = 0 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [showNote, setShowNote] = useState(false)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [editingUrl, setEditingUrl] = useState(false)
   const longPressTimer = useRef(null)
   const favicon = link.favicon || `https://www.google.com/s2/favicons?domain=${encodeURIComponent(link.url)}&sz=64`
 
@@ -18,13 +114,22 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
     if (longPressTimer.current) clearTimeout(longPressTimer.current)
   }
 
+  const handleSaveField = (field, value) => {
+    onEdit?.({ ...link, [field]: value })
+    if (field === 'title') setEditingTitle(false)
+    if (field === 'url') setEditingUrl(false)
+  }
+
+  const isMobile = typeof window !== 'undefined' && 'ontouchstart' in window
+
   return (
     <div
       onContextMenu={(e) => { e.preventDefault(); if (onSelect) onSelect(link) }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchEnd}
-      className={`group glass rounded-2xl p-4 transition-all surface-hover ${link.is_pinned ? 'ring-1 ring-accent-500/30' : ''} ${selected ? 'ring-2 ring-accent-500' : ''}`} style={{ overflow: 'visible' }}
+      className={`group glass rounded-2xl p-4 transition-all surface-hover relative ${link.is_pinned ? 'ring-1 ring-accent-500/30' : ''} ${selected ? 'ring-2 ring-accent-500' : ''}`}
+      style={{ overflow: 'visible' }}
     >
       {/* Pinned indicator */}
       {link.is_pinned && (
@@ -48,21 +153,54 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
       <div className="flex items-start gap-3">
         <div className="relative shrink-0">
           <div className="absolute inset-0 blur-md bg-accent-500/5 rounded-lg" />
-          <img src={favicon} alt="" className="relative h-10 w-10 rounded-xl object-contain p-1.5" style={{ background: 'var(--bg-tertiary)' }}
-            onError={(e) => { e.target.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(link.url)}&sz=64` }}
-          />
+          {/* Favicon with tooltip (desktop only) */}
+          <div className="relative favicon-tooltip" data-tooltip={`${getDomain(link.url)}${link.created_at ? ' · ' + formatDate(link.created_at) : ''}`}>
+            <img src={favicon} alt="" className="relative h-10 w-10 rounded-xl object-contain p-1.5" style={{ background: 'var(--bg-tertiary)' }}
+              onError={(e) => { e.target.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(link.url)}&sz=64` }}
+            />
+          </div>
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{link.title}</h3>
+            {editingTitle ? (
+              <InlineEdit
+                value={link.title}
+                onSave={(v) => handleSaveField('title', v)}
+                onCancel={() => setEditingTitle(false)}
+                className="text-sm font-medium"
+                placeholder="Link title"
+              />
+            ) : (
+              <h3
+                className="text-sm font-medium truncate cursor-default"
+                style={{ color: 'var(--text-primary)' }}
+                onDoubleClick={(e) => { if (!isMobile) { e.preventDefault(); setEditingTitle(true) } }}
+              >{link.title}</h3>
+            )}
             {link.is_favorite && <Star size={13} weight="fill" className="text-amber-400 shrink-0" />}
           </div>
           {link.description && <p className="text-xs mt-0.5 line-clamp-1" style={{ color: 'var(--text-tertiary)' }}>{link.description}</p>}
-          <a href={link.url} target="_blank" rel="noreferrer" className="text-xs mt-1.5 inline-flex items-center gap-1 truncate max-w-full" style={{ color: 'rgba(129, 140, 248, 0.8)' }}>
-            <span className="truncate">{link.url}</span>
-            <ArrowUpRight size={11} weight="bold" className="shrink-0" />
-          </a>
+          <div className="text-xs mt-1.5 inline-flex items-center gap-1.5 truncate max-w-full">
+            {editingUrl ? (
+              <InlineEdit
+                value={link.url}
+                onSave={(v) => handleSaveField('url', v)}
+                onCancel={() => setEditingUrl(false)}
+                className="text-xs"
+                placeholder="https://..."
+              />
+            ) : (
+              <a href={link.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 truncate max-w-full"
+                style={{ color: 'rgba(129, 140, 248, 0.8)' }}
+                onDoubleClick={(e) => { if (!isMobile) { e.preventDefault(); e.stopPropagation(); setEditingUrl(true) } }}
+              >
+                <StatusDot link={link} />
+                <span className="truncate">{link.url}</span>
+                <ArrowUpRight size={11} weight="bold" className="shrink-0" />
+              </a>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-1 shrink-0">

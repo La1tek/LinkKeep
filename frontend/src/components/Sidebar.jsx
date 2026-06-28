@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { Plus, X, FolderSimple, GearSix, SignOut } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import AnimatedCounter from './AnimatedCounter'
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4']
 
@@ -48,7 +49,7 @@ export default function Sidebar({ tabs, activeTabId, onSelectTab, onCreateTab, o
               >
                 <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: tab.color || '#6366f1' }} />
                 <span className="truncate">{tab.name}</span>
-                <span className="text-[10px] ml-auto group-hover:hidden" style={{ color: 'var(--text-muted)' }}>{tab.link_count}</span>
+                <span className="text-[10px] ml-auto group-hover:hidden" style={{ color: 'var(--text-muted)' }}><AnimatedCounter value={tab.link_count} /></span>
               </motion.button>
               <button
                 onClick={() => onDeleteTab(tab.id)}

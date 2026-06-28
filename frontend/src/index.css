@@ -130,6 +130,56 @@
     transition: transform 0.2s, opacity 0.2s;
   }
 
+  /* Skeleton stagger animation */
+  @keyframes skeleton-fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .skeleton-stagger {
+    animation: skeleton-fade-in 0.4s ease-out both;
+  }
+
+  /* Favicon tooltip (desktop only) */
+  @media (hover: hover) and (pointer: fine) {
+    .favicon-tooltip {
+      position: relative;
+    }
+    .favicon-tooltip::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 8px);
+      transform: translateX(-50%);
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 10px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      z-index: 30;
+    }
+    .favicon-tooltip:hover::after {
+      opacity: 1;
+    }
+  }
+
+  /* Status dot pulse */
+  @keyframes status-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.4); }
+  }
+
+  /* SVG accent theming */
+  .accent-stroke { stroke: rgba(129, 140, 248, 0.7); }
+  .accent-fill { fill: rgba(129, 140, 248, 0.7); }
+  html:not(.dark) .accent-stroke { stroke: rgba(99, 102, 241, 0.6); }
+  html:not(.dark) .accent-fill { fill: rgba(99, 102, 241, 0.6); }
+
   /* Hide scrollbar */
   .scrollbar-hide::-webkit-scrollbar { display: none; }
   .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }

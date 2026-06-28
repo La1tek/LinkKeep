@@ -1,6 +1,8 @@
-export function LinkSkeleton() {
+import { StackSimple, Plus } from '@phosphor-icons/react'
+
+export function LinkSkeleton({ index = 0 }) {
   return (
-    <div className="glass rounded-2xl p-4 overflow-hidden relative">
+    <div className="glass rounded-2xl p-4 overflow-hidden relative skeleton-stagger" style={{ animationDelay: `${index * 100}ms` }}>
       <div className="shimmer absolute inset-0" />
       <div className="flex items-start gap-3 relative">
         <div className="h-10 w-10 rounded-xl shimmer-block" />
