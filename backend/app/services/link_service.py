@@ -6,7 +6,7 @@ from typing import Optional
 
 async def fetch_metadata(url: str) -> dict:
     """Fetch title, description, and favicon from a URL."""
-    result = {"title": None, "description": None, "favicon": None}
+    result = {"title": None, "description": None, "favicon": None, "image": None}
 
     try:
         async with httpx.AsyncClient(timeout=8, follow_redirects=True) as client:
@@ -37,6 +37,11 @@ async def fetch_metadata(url: str) -> dict:
             result["favicon"] = urljoin(url, favicon_icon["href"])
         else:
             result["favicon"] = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
+
+        # OG Image
+        og_image = soup.find("meta", property="og:image")
+        if og_image and og_image.get("content"):
+            result["image"] = og_image["content"][:512]
 
     except Exception:
         pass

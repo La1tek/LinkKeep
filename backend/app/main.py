@@ -22,6 +22,8 @@ async def lifespan(app: FastAPI):
             conn.exec_driver_sql('ALTER TABLE links ADD COLUMN is_pinned BOOLEAN DEFAULT 0')
         if 'note' not in link_cols:
             conn.exec_driver_sql('ALTER TABLE links ADD COLUMN note TEXT')
+        if 'image' not in link_cols:
+            conn.exec_driver_sql('ALTER TABLE links ADD COLUMN image TEXT')
         if 'parent_id' not in tab_cols:
             conn.exec_driver_sql('ALTER TABLE tabs ADD COLUMN parent_id INTEGER')
         conn.commit()

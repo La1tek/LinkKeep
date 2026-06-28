@@ -50,6 +50,8 @@ class TabOut(TabBase):
     parent_id: Optional[int] = None
     created_at: datetime
     link_count: int = 0
+    child_count: int = 0
+    total_link_count: int = 0
 
     class Config:
         from_attributes = True
@@ -62,6 +64,7 @@ class LinkBase(BaseModel):
     url: str
     description: Optional[str] = None
     favicon: Optional[str] = None
+    image: Optional[str] = None
     tab_id: Optional[int] = None
     tags: List[str] = []
     is_favorite: bool = False
@@ -78,6 +81,7 @@ class LinkUpdate(BaseModel):
     url: Optional[str] = None
     description: Optional[str] = None
     favicon: Optional[str] = None
+    image: Optional[str] = None
     tab_id: Optional[int] = None
     tags: Optional[List[str]] = None
     is_favorite: Optional[bool] = None
@@ -114,6 +118,7 @@ class MetadataResponse(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     favicon: Optional[str] = None
+    image: Optional[str] = None
 
 
 # ── Generic ──────────────────────────────────────────

@@ -19,7 +19,7 @@ export default function LinkModal({ open, onClose, onSubmit, initial, tabs, defa
     } else {
       setTitle(''); setUrl(''); setDescription(''); setTabId(defaultTabId || ''); setTags(''); setAutoFetched(false)
     }
-  }, [initial, open])
+  }, [initial, open, defaultTabId])
 
   const handleUrlBlur = async () => {
     if (autoFetched || !url) return
@@ -33,6 +33,11 @@ export default function LinkModal({ open, onClose, onSubmit, initial, tabs, defa
       const meta = await res.json()
       if (meta.title && !title) setTitle(meta.title)
       if (meta.description && !description) setDescription(meta.description)
+      // Store image from metadata for submission
+      if (meta.image) {
+        // We'll attach it in handleSubmit
+        window.__linkMetaImage = meta.image
+      }
       setAutoFetched(true)
     } catch {} finally { setFetching(false) }
   }
@@ -40,7 +45,9 @@ export default function LinkModal({ open, onClose, onSubmit, initial, tabs, defa
   const handleSubmit = (e) => {
     e.preventDefault()
     const tagList = tags.split(',').map(t => t.trim()).filter(Boolean)
-    onSubmit({ title, url, description: description || null, tab_id: tabId ? Number(tabId) : null, tags: tagList })
+    const metaImage = window.__linkMetaImage
+    window.__linkMetaImage = null
+    onSubmit({ title, url, description: description || null, image: initial?.image || metaImage || null, tab_id: tabId ? Number(tabId) : null, tags: tagList })
   }
 
   return (

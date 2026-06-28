@@ -45,6 +45,7 @@ class Link(Base):
     url = Column(Text, nullable=False)
     description = Column(Text, nullable=True)
     favicon = Column(String(512), nullable=True)
+    image = Column(Text, nullable=True)
     tab_id = Column(Integer, ForeignKey("tabs.id", ondelete="CASCADE"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     is_favorite = Column(Boolean, default=False)

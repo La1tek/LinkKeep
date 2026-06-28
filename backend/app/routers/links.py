@@ -62,6 +62,7 @@ def create_link(link: LinkCreate, user: User = Depends(_get_current_user), db: S
         url=link.url,
         description=link.description,
         favicon=link.favicon,
+        image=link.image,
         tab_id=link.tab_id,
         tags=link.tags,
         is_favorite=link.is_favorite,

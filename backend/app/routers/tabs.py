@@ -18,6 +18,11 @@ def list_tabs(user: User = Depends(_get_current_user), db: Session = Depends(get
     for t in tabs:
         out = TabOut.model_validate(t)
         out.link_count = db.query(Link).filter(Link.tab_id == t.id).count()
+        out.child_count = db.query(Tab).filter(Tab.parent_id == t.id).count()
+        # Recursive link count: own links + children links
+        child_ids = [c.id for c in db.query(Tab).filter(Tab.parent_id == t.id).all()]
+        child_link_count = db.query(Link).filter(Link.tab_id.in_(child_ids)).count() if child_ids else 0
+        out.total_link_count = out.link_count + child_link_count
         result.append(out)
     return result
 

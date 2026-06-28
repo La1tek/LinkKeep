@@ -1,24 +1,25 @@
 import { motion } from 'framer-motion'
-import { House, Star, GearSix } from '@phosphor-icons/react'
+import { House, Star, MagnifyingGlass, GearSix } from '@phosphor-icons/react'
 
 const navItems = [
   { path: '/', label: 'Home', icon: House },
   { path: '/favorites', label: 'Saved', icon: Star },
+  { path: '/search', label: 'Search', icon: MagnifyingGlass },
   { path: '/settings', label: 'Settings', icon: GearSix },
 ]
 
 export default function BottomNav({ activePath, onNavigate }) {
   return (
     <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 glass pb-[env(safe-area-inset-bottom)]" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-      <div className="flex items-center justify-around px-2 py-1.5">
+      <div className="flex items-center justify-around px-1 py-1.5">
         {navItems.map((item) => {
           const Icon = item.icon
-          const active = activePath === item.path
+          const active = activePath === item.path || (item.path !== '/' && activePath.startsWith(item.path + '/'))
           return (
             <button
               key={item.path}
               onClick={() => onNavigate(item.path)}
-              className="relative flex flex-col items-center gap-0.5 px-6 py-1.5"
+              className="relative flex flex-col items-center gap-0.5 px-4 py-1.5"
             >
               {active && (
                 <motion.div
