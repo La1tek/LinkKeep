@@ -67,13 +67,15 @@
       $('#loginBtn').disabled = true;
       setStatus('Connecting...', 'loading');
       try {
-        const data = await new Promise((resolve, reject) => {
-          chrome.runtime.sendMessage({ type: 'api', path: '/auth/login', method: 'POST', formFields: { username, password } }, (res) => {
-            if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-            if (res.ok) resolve(res.data);
-            else reject(new Error(res.data?.detail || 'Login failed'));
-          });
-        });
+        // Direct fetch login (no service worker dependency)
+        const fd = new FormData();
+        fd.append('username', username);
+        fd.append('password', password);
+        const r = await fetch(`${server}/api/auth/login`, { method: 'POST', body: fd });
+        const text = await r.text();
+        let data;
+        try { data = JSON.parse(text); } catch { throw new Error('Invalid server response'); }
+        if (!r.ok) throw new Error(data?.detail || `HTTP ${r.status}`);
         await chrome.storage.local.set({ lk_server: server, lk_token: data.access_token, lk_user: username });
         hideStatus();
         location.reload();
