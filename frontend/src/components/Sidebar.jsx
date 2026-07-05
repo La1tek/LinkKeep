@@ -79,7 +79,7 @@ export default function Sidebar({ tabs, activePath, onSelectTab, onSelectAll, on
             )}
             <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: tab.color || '#6366f1' }} />
             <span className="truncate">{tab.name}</span>
-            <span className="text-[10px] ml-auto" style={{ color: 'var(--text-muted)' }}>
+            <span className="text-[10px] ml-auto transition-opacity group-hover:opacity-0" style={{ color: 'var(--text-muted)' }}>
               <AnimatedCounter value={tab.total_link_count ?? tab.link_count} />
             </span>
           </motion.button>

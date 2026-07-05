@@ -84,4 +84,14 @@ export const api = {
 
   // Duplicates
   findDuplicates: () => request('/links/duplicates'),
+
+  // Health
+  checkHealth: (tabId) => {
+    const q = tabId ? `?tab_id=${tabId}` : ''
+    return request(`/links/check-health${q}`, { method: 'POST' })
+  },
+  getDeadLinks: () => request('/links/dead'),
+
+  // Reader
+  fetchContent: (linkId) => request(`/links/${linkId}/fetch-content`, { method: 'POST' }),
 }

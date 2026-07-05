@@ -53,6 +53,10 @@ class Link(Base):
     note = Column(Text, nullable=True)
     sort_order = Column(Integer, default=0)
     tags = Column(JSON, default=list)
+    http_status = Column(Integer, nullable=True)
+    last_checked = Column(DateTime, nullable=True)
+    content = Column(Text, nullable=True)
+    content_fetched = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

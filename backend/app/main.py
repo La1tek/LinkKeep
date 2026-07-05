@@ -26,6 +26,14 @@ async def lifespan(app: FastAPI):
             conn.exec_driver_sql('ALTER TABLE links ADD COLUMN image TEXT')
         if 'parent_id' not in tab_cols:
             conn.exec_driver_sql('ALTER TABLE tabs ADD COLUMN parent_id INTEGER')
+        if 'http_status' not in link_cols:
+            conn.exec_driver_sql('ALTER TABLE links ADD COLUMN http_status INTEGER')
+        if 'last_checked' not in link_cols:
+            conn.exec_driver_sql('ALTER TABLE links ADD COLUMN last_checked TIMESTAMP')
+        if 'content' not in link_cols:
+            conn.exec_driver_sql('ALTER TABLE links ADD COLUMN content TEXT')
+        if 'content_fetched' not in link_cols:
+            conn.exec_driver_sql('ALTER TABLE links ADD COLUMN content_fetched TIMESTAMP')
         conn.commit()
     # Start Telegram bot if token is set
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")

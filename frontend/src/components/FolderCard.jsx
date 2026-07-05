@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { DotsThree, PencilSimple, Trash } from '@phosphor-icons/react'
+import { DotsThree, PencilSimple, Trash, CaretRight } from '@phosphor-icons/react'
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AnimatedCounter from './AnimatedCounter'
@@ -103,6 +103,14 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
             <DotsThree size={16} weight="bold" />
           </button>
         </div>
+
+        {/* Subfolder indicator */}
+        {(tab.child_count > 0) && (
+          <div className="flex items-center gap-1 mt-2">
+            <CaretRight size={10} weight="bold" style={{ color: accentColor }} />
+            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{tab.child_count} subfolder{tab.child_count === 1 ? '' : 's'}</span>
+          </div>
+        )}
 
         {/* Preview favicons */}
         {previewFavicons.length > 0 && (

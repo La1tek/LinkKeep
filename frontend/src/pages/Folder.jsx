@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, ArrowLeft, PushPin, CheckSquare, X, Trash, MagnifyingGlass, ListBullets, SquaresFour } from '@phosphor-icons/react'
+import { Plus, ArrowLeft, PushPin, CheckSquare, X, Trash, MagnifyingGlass, ListBullets, SquaresFour, FolderPlus, CaretRight, BookOpen, ArrowUpRight, Clipboard } from '@phosphor-icons/react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTabStore } from '../hooks/useTabStore'
 import { useLinks } from '../hooks/useLinks'
@@ -39,7 +39,7 @@ function throttle(fn, ms) {
 export default function Folder({ token }) {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { tabs, refresh: refreshTabs } = useTabStore()
+  const { tabs, create: createTab, refresh: refreshTabs } = useTabStore()
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('newest')
   const [activeTag, setActiveTag] = useState(null)
@@ -51,6 +51,14 @@ export default function Folder({ token }) {
   const [pulling, setPulling] = useState(false)
   const [headerScrolled, setHeaderScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [newSubOpen, setNewSubOpen] = useState(false)
+  const [newSubName, setNewSubName] = useState('')
+  const [newSubColor, setNewSubColor] = useState('#6366f1')
+  const [readerLink, setReaderLink] = useState(null)
+  const [readerContent, setReaderContent] = useState('')
+  const [readerLoading, setReaderLoading] = useState(false)
+  const [healthChecking, setHealthChecking] = useState(false)
+  const [healthResult, setHealthResult] = useState(null)
   const touchStartY = useRef(0)
   const toast = useToast()
   const { mode: viewMode, toggle: toggleViewMode } = useViewMode()
@@ -60,6 +68,9 @@ export default function Folder({ token }) {
   // Determine if "all" or specific folder
   const isAll = id === 'all'
   const currentTab = safeTabs.find(t => t.id === Number(id))
+
+  // Child folders of current folder
+  const childTabs = useMemo(() => safeTabs.filter(t => t.parent_id === Number(id)), [safeTabs, id])
 
   // Adaptive scroll
   useEffect(() => {
@@ -137,6 +148,24 @@ export default function Folder({ token }) {
   }
 
   const handleEditLink = async (link) => {
+    // Handle reader mode actions
+    if (link._fetchContent) {
+      setReaderLink(link); setReaderContent(''); setReaderLoading(true)
+      try {
+        const result = await api.fetchContent(link.id)
+        setReaderContent(result.content || 'No content extracted')
+        refresh() // update link object to show content is saved
+      } catch (err) {
+        toast.error(err.message)
+        setReaderLink(null)
+      }
+      setReaderLoading(false)
+      return
+    }
+    if (link._showReader) {
+      setReaderLink(link); setReaderContent(link.content || 'No content saved')
+      return
+    }
     if (link.note !== undefined && link.id) {
       try { await api.updateLink(link.id, { note: link.note }) } catch {}
     }
@@ -208,7 +237,63 @@ export default function Folder({ token }) {
     }
   }
 
+  const handlePasteSave = async () => {
+    let url = ''
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        url = await navigator.clipboard.readText()
+      }
+    } catch {}
+    if (!url || !url.trim().startsWith('http')) {
+      url = prompt('Paste URL here:')?.trim() || ''
+    }
+    url = url.trim()
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      toast.error('Invalid URL')
+      return
+    }
+    toast.success('Saving...')
+    try {
+      const tabId = isAll ? null : Number(id)
+      await createLink({ url, tab_id: tabId })
+      toast.success('Link saved from clipboard')
+      refresh()
+    } catch (err) {
+      if (err.name === 'NotAllowedError') {
+        toast.error('Clipboard access denied')
+      } else {
+        toast.error(err.message)
+      }
+    }
+  }
+
+  const handleCheckHealth = async () => {
+    setHealthChecking(true); setHealthResult(null)
+    try {
+      const params = isAll ? {} : { tab_id: Number(id) }
+      const q = params.tab_id ? `?tab_id=${params.tab_id}` : ''
+      const result = await fetch(`/api/links/check-health${q}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).then(r => r.json())
+      setHealthResult(result)
+      refresh()
+      toast.success(`Checked ${result.checked} links: ${result.dead} dead`, 4000)
+    } catch (err) {
+      toast.error(err.message)
+    }
+    setHealthChecking(false)
+  }
+
   const defaultTabId = isAll ? '' : (id || '')
+
+  // Create subfolder
+  const handleCreateSub = () => {
+    if (!newSubName.trim()) return
+    createTab({ name: newSubName.trim(), color: newSubColor, parent_id: Number(id) })
+    setNewSubName(''); setNewSubColor('#6366f1'); setNewSubOpen(false)
+    toast.success('Subfolder created')
+  }
 
   const isGrid = viewMode === 'grid'
 
@@ -290,9 +375,18 @@ export default function Folder({ token }) {
               <button onClick={toggleViewMode} className="p-2 rounded-lg transition-colors surface-hover" style={{ color: 'var(--text-muted)' }}>
                 {isGrid ? <ListBullets size={16} /> : <SquaresFour size={16} />}
               </button>
+              <button onClick={handleCheckHealth} disabled={healthChecking} className="p-2 rounded-lg transition-colors surface-hover" style={{ color: healthChecking ? 'var(--text-muted)' : healthResult?.dead > 0 ? '#ef4444' : 'var(--text-muted)' }} title="Check link health">
+                <span className={`text-[10px] font-bold ${healthChecking ? 'animate-pulse' : ''}`}>{healthChecking ? '...' : healthResult ? `${healthResult.dead}⚡` : '⚡'}</span>
+              </button>
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="glass text-xs rounded-lg px-2 py-2 border-none outline-none cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
                 <option value="newest">Newest</option><option value="oldest">Oldest</option><option value="az">A-Z</option><option value="za">Z-A</option>
               </select>
+              {/* Create subfolder button (not in All Links) */}
+              {!isAll && (
+                <button onClick={() => setNewSubOpen(true)} className="p-2 rounded-lg transition-colors surface-hover" style={{ color: 'var(--text-muted)' }} title="Create subfolder">
+                  <FolderPlus size={16} />
+                </button>
+              )}
               <button onClick={() => setSelectionMode(!selectionMode)} className={`p-2 rounded-lg transition-colors ${selectionMode ? 'bg-accent-600 text-white' : ''}`} style={!selectionMode ? { color: 'var(--text-muted)' } : {}}><CheckSquare size={16} /></button>
               {/* 3-dot menu for folder actions */}
               {!isAll && currentTab && (
@@ -309,6 +403,9 @@ export default function Folder({ token }) {
                   </AnimatePresence>
                 </div>
               )}
+              <button onClick={handlePasteSave} className="h-9 w-9 glass rounded-xl active:scale-95 transition-all flex items-center justify-center surface-hover" style={{ color: 'var(--text-muted)' }} title="Paste URL from clipboard">
+                <Clipboard size={18} />
+              </button>
               <button onClick={() => { setEditingLink(null); setModalOpen(true) }} className="h-9 w-9 bg-accent-600 text-white rounded-xl active:scale-95 transition-all flex items-center justify-center hover:bg-accent-500"><Plus size={18} weight="bold" /></button>
             </div>
           </div>
@@ -346,6 +443,41 @@ export default function Folder({ token }) {
       </AnimatePresence>
 
       <main className="px-4 sm:px-8 py-4 pb-24 sm:pb-8">
+        {/* Subfolder chips */}
+        {!isAll && childTabs.length > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <h2 className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Subfolders</h2>
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{childTabs.length}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {childTabs.map(child => {
+                const childColor = child.color || '#6366f1'
+                const childLinks = child.total_link_count ?? child.link_count ?? 0
+                return (
+                  <motion.button
+                    key={child.id}
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => navigate(`/folder/${child.id}`)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs glass transition-all hover:shadow-md"
+                    style={{ border: `1px solid ${childColor}25` }}
+                  >
+                    <div className="h-5 w-5 rounded-lg flex items-center justify-center" style={{ background: `${childColor}20` }}>
+                      <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: childColor }} />
+                    </div>
+                    <span className="font-medium truncate max-w-[120px]" style={{ color: 'var(--text-primary)' }}>{child.name}</span>
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{childLinks}</span>
+                    {child.child_count > 0 && (
+                      <CaretRight size={10} weight="bold" style={{ color: 'var(--text-muted)' }} />
+                    )}
+                  </motion.button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className={`${isGrid ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid grid-cols-1 md:grid-cols-2'} gap-3`}>
             {Array.from({ length: 4 }).map((_, i) => <LinkSkeleton key={i} index={i} />)}
@@ -380,9 +512,83 @@ export default function Folder({ token }) {
       </main>
 
       {/* Floating add button on mobile */}
-      <button onClick={() => { setEditingLink(null); setModalOpen(true) }} className="sm:hidden fixed bottom-20 right-4 z-40 h-14 w-14 bg-accent-600 text-white rounded-2xl shadow-lg shadow-accent-600/30 flex items-center justify-center active:scale-90 transition-transform"><Plus size={24} weight="bold" /></button>
+      <button onClick={() => { setEditingLink(null); setModalOpen(true) }} onContextMenu={(e) => { e.preventDefault(); handlePasteSave() }} className="sm:hidden fixed bottom-20 right-4 z-40 h-14 w-14 bg-accent-600 text-white rounded-2xl shadow-lg shadow-accent-600/30 flex items-center justify-center active:scale-90 transition-transform" title="Tap: add link, Long press: paste from clipboard"><Plus size={24} weight="bold" /></button>
 
       <LinkModal open={modalOpen} onClose={() => { setModalOpen(false); setEditingLink(null) }} onSubmit={handleAddLink} initial={editingLink} tabs={safeTabs} defaultTabId={defaultTabId} />
+
+      {/* Reader modal */}
+      <AnimatePresence>
+        {readerLink && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setReaderLink(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.97 }}
+              className="glass rounded-2xl max-w-2xl w-full max-h-[80vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <BookOpen size={16} style={{ color: '#818cf8' }} />
+                  <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{readerLink.title}</h3>
+                </div>
+                <button onClick={() => setReaderLink(null)} className="p-1.5 rounded-lg surface-hover" style={{ color: 'var(--text-muted)' }}>
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="px-5 py-4 overflow-y-auto flex-1">
+                {readerLoading ? (
+                  <div className="space-y-2">
+                    <div className="h-3 rounded-lg w-full animate-pulse" style={{ background: 'var(--bg-tertiary)' }} />
+                    <div className="h-3 rounded-lg w-4/5 animate-pulse" style={{ background: 'var(--bg-tertiary)' }} />
+                    <div className="h-3 rounded-lg w-3/4 animate-pulse" style={{ background: 'var(--bg-tertiary)' }} />
+                  </div>
+                ) : (
+                  <pre className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text-secondary)', fontFamily: 'inherit' }}>{readerContent}</pre>
+                )}
+              </div>
+              <div className="px-5 py-3 shrink-0 flex items-center justify-between" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                <a href={readerLink.url} target="_blank" rel="noreferrer" className="text-[11px] flex items-center gap-1 truncate" style={{ color: 'rgba(129,140,248,0.8)' }}>
+                  {readerLink.url}<ArrowUpRight size={10} weight="bold" />
+                </a>
+                {readerLink.content_fetched && (
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Saved {new Date(readerLink.content_fetched).toLocaleString()}</span>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* New subfolder modal */}
+      {newSubOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }} onClick={() => setNewSubOpen(false)}>
+          <div className="glass rounded-2xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>New Subfolder</h3>
+            <p className="text-[11px] mb-4" style={{ color: 'var(--text-tertiary)' }}>Inside "{currentTab?.name || ''}"</p>
+            <input autoFocus value={newSubName} onChange={(e) => setNewSubName(e.target.value)} placeholder="Subfolder name..." className="input-base w-full rounded-xl px-4 py-2.5 text-sm outline-none mb-3" onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSub() }} />
+            {newSubName.trim() && (
+              <div className="flex items-center gap-2 mb-4">
+                <label className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Color:</label>
+                {[ '#6366f1', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#ef4444'].map(c => (
+                  <button key={c} type="button" onClick={() => setNewSubColor(c)} className={`h-5 w-5 rounded-full transition-transform ${newSubColor === c ? 'scale-125 ring-2 ring-white/20' : ''}`} style={{ backgroundColor: c }} />
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={handleCreateSub} disabled={!newSubName.trim()} className="flex-1 bg-accent-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-accent-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all">Create</button>
+              <button onClick={() => setNewSubOpen(false)} className="glass px-4 py-2.5 rounded-xl text-sm surface-hover" style={{ color: 'var(--text-secondary)' }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

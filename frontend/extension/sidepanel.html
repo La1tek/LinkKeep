@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root {
+      --bg: #09090b; --bg-card: #18181b; --bg-hover: #27272a; --bg-input: #09090b;
+      --border: #3f3f46; --border-subtle: #27272a;
+      --text: #f4f4f5; --text-secondary: #a1a1aa; --text-muted: #71717a;
+      --accent: #6366f1; --green: #22c55e; --red: #ef4444; --amber: #f59e0b;
+      --radius: 8px; --radius-sm: 6px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { width: 100%; height: 100vh; font-family: -apple-system, system-ui, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 13px; display: flex; flex-direction: column; }
+    body::-webkit-scrollbar { width: 4px; }
+    body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .header { padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-card); flex-shrink: 0; }
+    .header-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .header-top img { width: 20px; height: 20px; border-radius: 5px; }
+    .header-top h1 { font-size: 13px; font-weight: 600; flex: 1; }
+    .header-top .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+    .search-box { position: relative; }
+    .search-box input { width: 100%; padding: 7px 10px 7px 28px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text); font-size: 12px; outline: none; }
+    .search-box input:focus { border-color: var(--accent); }
+    .search-box span { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--text-muted); pointer-events: none; }
+
+    /* Folder tree sidebar */
+    .tree-bar { flex-shrink: 0; border-bottom: 1px solid var(--border-subtle); background: var(--bg-card); max-height: 200px; overflow-y: auto; }
+    .tree-bar::-webkit-scrollbar { width: 3px; }
+    .tree-bar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .tree-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; cursor: pointer; }
+    .tree-header:hover { color: var(--text-secondary); }
+    .tree-header .arrow { transition: transform 0.2s; font-size: 10px; }
+    .tree-header .arrow.open { transform: rotate(90deg); }
+    .tree-list { padding: 0 6px 6px; }
+    .tree-item { display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: var(--radius-sm); cursor: pointer; transition: background 0.1s; font-size: 11px; color: var(--text-secondary); }
+    .tree-item:hover { background: var(--bg-hover); }
+    .tree-item.active { background: rgba(99,102,241,0.1); color: var(--accent); }
+    .tree-item .ti-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .tree-item .ti-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tree-item .ti-count { font-size: 9px; color: var(--text-muted); }
+    .tree-item.child { padding-left: 22px; font-size: 10px; }
+
+    /* Content area */
+    .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .content-header { padding: 6px 14px; font-size: 10px; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border-bottom: 1px solid var(--border-subtle); flex-shrink: 0; }
+    .links { flex: 1; overflow-y: auto; }
+    .link-item { padding: 9px 14px; display: flex; gap: 9px; cursor: pointer; transition: background 0.1s; border-bottom: 1px solid var(--border-subtle); }
+    .link-item:hover { background: var(--bg-hover); }
+    .link-item .lf { width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0; }
+    .link-item .li { flex: 1; min-width: 0; }
+    .link-item .lt { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
+    .link-item .ld { font-size: 10px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+    .link-item .ln { font-size: 10px; color: var(--text-secondary); font-style: italic; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .link-item .lfav { color: var(--amber); margin-left: auto; flex-shrink: 0; font-size: 11px; }
+    .status-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+    .empty { padding: 40px 16px; text-align: center; color: var(--text-muted); font-size: 12px; }
+
+    /* Footer */
+    .footer { padding: 7px 14px; border-top: 1px solid var(--border-subtle); flex-shrink: 0; display: flex; gap: 5px; }
+    .footer button { flex: 1; padding: 7px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-secondary); font-size: 11px; cursor: pointer; transition: all 0.15s; }
+    .footer button:hover { background: var(--bg-hover); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-top">
+      <img src="icons/icon48.png" />
+      <h1>LinkKeep</h1>
+      <div class="dot"></div>
+    </div>
+    <div class="search-box">
+      <span>🔍</span>
+      <input id="searchInput" placeholder="Search bookmarks..." />
+    </div>
+  </div>
+
+  <!-- Folder tree -->
+  <div class="tree-bar" id="treeBar">
+    <div class="tree-header" id="treeToggle">
+      <span>📁 Folders</span>
+      <span class="arrow open" id="treeArrow">▶</span>
+    </div>
+    <div class="tree-list" id="treeList"></div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+    <div class="content-header" id="contentHeader">
+      <span id="currentFolder">All Links</span>
+      <span id="linkCount"></span>
+    </div>
+    <div class="links" id="linksList">
+      <div class="empty">Loading...</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button id="btnOpen">📂 Open</button>
+    <button id="btnSave">💾 Save this tab</button>
+    <button id="btnHealth">⚡ Health</button>
+  </div>
+
+  <script>
+    async function api(path) {
+      return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ type: 'api', path }, (res) => {
+          if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+          if (res.ok) resolve(res.data);
+          else reject(new Error(res.data?.detail || 'Failed'));
+        });
+      });
+    }
+
+    let currentTabId = 'all';
+    let allTabs = [];
+
+    // --- Folder tree ---
+    function renderTree(tabs) {
+      allTabs = tabs || [];
+      const list = document.getElementById('treeList');
+      const rootTabs = allTabs.filter(t => !t.parent_id);
+
+      list.innerHTML = `
+        <div class="tree-item ${currentTabId === 'all' ? 'active' : ''}" data-id="all">
+          <span class="ti-dot" style="background:var(--text-muted)"></span>
+          <span class="ti-name">All Links</span>
+        </div>`;
+
+      rootTabs.forEach(t => {
+        list.innerHTML += `
+          <div class="tree-item ${currentTabId === String(t.id) ? 'active' : ''}" data-id="${t.id}">
+            <span class="ti-dot" style="background:${t.color || '#6366f1'}"></span>
+            <span class="ti-name">${t.name}</span>
+            <span class="ti-count">${t.total_link_count || t.link_count || 0}</span>
+          </div>`;
+
+        // Children
+        const children = allTabs.filter(c => c.parent_id === t.id);
+        children.forEach(c => {
+          list.innerHTML += `
+            <div class="tree-item child ${currentTabId === String(c.id) ? 'active' : ''}" data-id="${c.id}">
+              <span class="ti-dot" style="background:${c.color || '#6366f1'};opacity:0.7"></span>
+              <span class="ti-name">${c.name}</span>
+              <span class="ti-count">${c.total_link_count || c.link_count || 0}</span>
+            </div>`;
+        });
+      });
+
+      // Click handlers
+      list.querySelectorAll('.tree-item').forEach(item => {
+        item.addEventListener('click', () => {
+          list.querySelectorAll('.tree-item').forEach(i => i.classList.remove('active'));
+          item.classList.add('active');
+          currentTabId = item.dataset.id;
+          document.getElementById('currentFolder').textContent = currentTabId === 'all' ? 'All Links' : item.querySelector('.ti-name').textContent;
+          document.getElementById('searchInput').value = '';
+          loadLinks();
+        });
+      });
+    }
+
+    // Toggle tree
+    let treeOpen = true;
+    document.getElementById('treeToggle').addEventListener('click', () => {
+      treeOpen = !treeOpen;
+      document.getElementById('treeList').style.display = treeOpen ? '' : 'none';
+      document.getElementById('treeArrow').classList.toggle('open', treeOpen);
+    });
+
+    // --- Load links ---
+    async function loadLinks(search) {
+      const list = document.getElementById('linksList');
+      list.innerHTML = '<div class="empty">Loading...</div>';
+
+      try {
+        let links;
+        if (search) {
+          links = await api(`/links?search=${encodeURIComponent(search)}&limit=100`);
+          document.getElementById('currentFolder').textContent = `Search: "${search}"`;
+        } else {
+          const params = currentTabId === 'all' ? '?limit=100' : `?tab_id=${currentTabId}&limit=100`;
+          links = await api(`/links${params}`);
+        }
+
+        document.getElementById('linkCount').textContent = `${(links || []).length} links`;
+
+        if (!links || links.length === 0) {
+          list.innerHTML = '<div class="empty">No bookmarks</div>';
+          return;
+        }
+
+        list.innerHTML = links.map(l => {
+          let domain = '';
+          try { domain = new URL(l.url).hostname; } catch {}
+          const statusColor = !l.http_status ? '' : l.http_status >= 400 ? 'var(--red)' : l.http_status >= 300 ? 'var(--amber)' : 'var(--green)';
+          return `
+            <div class="link-item" data-url="${l.url.replace(/"/g, '&quot;')}">
+              <img class="lf" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32" />
+              <div class="li">
+                <div class="lt">
+                  ${statusColor ? `<span class="status-dot" style="background:${statusColor}" title="HTTP ${l.http_status}"></span>` : ''}
+                  ${(l.title || 'Untitled').replace(/</g, '&lt;')}
+                </div>
+                <div class="ld">${domain}</div>
+                ${l.note ? `<div class="ln">${l.note.replace(/</g, '&lt;')}</div>` : ''}
+              </div>
+              ${l.is_favorite ? '<span class="lfav">⭐</span>' : ''}
+            </div>`;
+        }).join('');
+
+        list.querySelectorAll('.link-item').forEach(item => {
+          item.addEventListener('click', () => chrome.tabs.create({ url: item.dataset.url }));
+        });
+      } catch (e) {
+        list.innerHTML = `<div class="empty" style="color:var(--red)">${e.message}</div>`;
+      }
+    }
+
+    // --- Search ---
+    let sTimer;
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      clearTimeout(sTimer);
+      const q = e.target.value.trim();
+      if (!q) { loadLinks(); return; }
+      sTimer = setTimeout(() => loadLinks(q), 300);
+    });
+
+    // --- Footer ---
+    document.getElementById('btnOpen').addEventListener('click', async () => {
+      const { lk_server } = await chrome.storage.local.get('lk_server');
+      if (lk_server) chrome.tabs.create({ url: lk_server });
+    });
+
+    document.getElementById('btnSave').addEventListener('click', async () => {
+      const btn = document.getElementById('btnSave');
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      btn.textContent = 'Saving...';
+      try {
+        const meta = await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage({ type: 'api', path: '/metadata', method: 'POST', body: { url: tab.url } }, (res) => {
+            if (res.ok) resolve(res.data); else reject(new Error(res.data?.detail));
+          });
+        });
+        await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage({ type: 'api', path: '/links', method: 'POST', body: { title: meta?.title || tab.title, url: tab.url } }, (res) => {
+            if (res.ok) resolve(); else reject(new Error(res.data?.detail));
+          });
+        });
+        btn.textContent = '✓ Saved!';
+        setTimeout(() => { btn.textContent = '💾 Save this tab'; loadLinks(); }, 1500);
+      } catch (e) {
+        btn.textContent = '✗ Error';
+        setTimeout(() => { btn.textContent = '💾 Save this tab'; }, 2000);
+      }
+    });
+
+    document.getElementById('btnHealth').addEventListener('click', async () => {
+      const btn = document.getElementById('btnHealth');
+      btn.textContent = '⚡ Checking...';
+      btn.style.color = 'var(--accent)';
+      try {
+        const res = await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage({ type: 'api', path: '/links/check-health', method: 'POST' }, (res) => {
+            if (res.ok) resolve(res.data); else reject(new Error(res.data?.detail));
+          });
+        });
+        btn.textContent = `⚡ ${res.dead} dead / ${res.checked}`;
+        btn.style.color = res.dead > 0 ? 'var(--red)' : 'var(--green)';
+        loadLinks(); // refresh to show new status dots
+        setTimeout(() => { btn.textContent = '⚡ Health'; btn.style.color = ''; }, 5000);
+      } catch (e) {
+        btn.textContent = '⚡ Error';
+        btn.style.color = 'var(--red)';
+        setTimeout(() => { btn.textContent = '⚡ Health'; btn.style.color = ''; }, 3000);
+      }
+    });
+
+    // --- Init ---
+    const tabs = await api('/tabs');
+    renderTree(tabs);
+    loadLinks();
+  </script>
+</body>
+</html>

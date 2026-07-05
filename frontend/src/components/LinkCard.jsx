@@ -1,4 +1,4 @@
-import { Star, DotsThreeVertical, ArrowUpRight, Trash, PencilSimple, PushPin, PushPinSlash, NotePencil, Check } from '@phosphor-icons/react'
+import { Star, DotsThreeVertical, ArrowUpRight, Trash, PencilSimple, PushPin, PushPinSlash, NotePencil, Check, GlobeHemisphereWest, BookOpen } from '@phosphor-icons/react'
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -61,37 +61,22 @@ function InlineEdit({ value, onSave, onCancel, placeholder, className, multiline
 }
 
 function StatusDot({ link }) {
-  const [status, setStatus] = useState('checking')
-
-  useEffect(() => {
-    // New links show "checking" for 2 seconds, then "alive"
-    // All links default to "alive" since we don't have real checking
-    const timer = setTimeout(() => setStatus('alive'), 2000)
-    // Mark as alive immediately for existing links (created more than 2s ago)
-    if (link.created_at) {
-      const age = Date.now() - new Date(link.created_at).getTime()
-      if (age > 3000) {
-        clearTimeout(timer)
-        setStatus('alive')
-      }
-    }
-    return () => clearTimeout(timer)
-  }, [link.created_at])
-
-  const color = status === 'checking' ? 'var(--text-muted)' : '#22c55e'
-  const pulse = status === 'checking'
-
+  const httpStatus = link.http_status
+  // Not checked yet
+  if (httpStatus === null || httpStatus === undefined) {
+    return (
+      <span className="inline-flex items-center justify-center shrink-0" style={{ width: 6, height: 6 }}>
+        <span className="block rounded-full" style={{ width: 6, height: 6, backgroundColor: 'var(--text-muted)' }} />
+      </span>
+    )
+  }
+  const isDead = httpStatus >= 400
+  const isRedirect = httpStatus >= 300 && httpStatus < 400
+  const color = isDead ? '#ef4444' : isRedirect ? '#fbbf24' : '#22c55e'
+  const title = isDead ? `Dead (${httpStatus})` : isRedirect ? `Redirect (${httpStatus})` : `OK (${httpStatus})`
   return (
-    <span className="inline-flex items-center justify-center shrink-0" style={{ width: 6, height: 6 }}>
-      <span
-        className="block rounded-full"
-        style={{
-          width: 6,
-          height: 6,
-          backgroundColor: color,
-          animation: pulse ? 'status-pulse 1.5s ease-in-out infinite' : 'none',
-        }}
-      />
+    <span className="inline-flex items-center justify-center shrink-0" style={{ width: 6, height: 6 }} title={title}>
+      <span className="block rounded-full" style={{ width: 6, height: 6, backgroundColor: color }} />
     </span>
   )
 }
@@ -239,6 +224,24 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
                   >
                     <NotePencil size={13} /> {link.note ? 'Edit note' : 'Add note'}
                   </button>
+                  <button onClick={() => { window.open(`https://web.archive.org/web/${encodeURIComponent(link.url)}`, '_blank'); setMenuOpen(false) }}
+                    className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
+                  >
+                    <GlobeHemisphereWest size={13} /> Wayback Machine
+                  </button>
+                  {link.content ? (
+                    <button onClick={() => { onEdit?.({ ...link, _showReader: true }); setMenuOpen(false) }}
+                      className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
+                    >
+                      <BookOpen size={13} /> View saved content
+                    </button>
+                  ) : (
+                    <button onClick={() => { onEdit?.({ ...link, _fetchContent: true }); setMenuOpen(false) }}
+                      className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
+                    >
+                      <BookOpen size={13} /> Save & read content
+                    </button>
+                  )}
                   <button onClick={() => { onDelete?.(link); setMenuOpen(false) }}
                     className="w-full px-3 py-2 text-left text-xs hover:bg-red-500/10 flex items-center gap-2 text-red-400"
                   >

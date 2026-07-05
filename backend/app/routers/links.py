@@ -11,6 +11,12 @@ from app.schemas import (
 from app.routers.auth import _get_current_user
 
 from pydantic import BaseModel
+import time
+import re
+from datetime import datetime, timezone
+
+import httpx
+from bs4 import BeautifulSoup
 
 
 class ReorderItem(BaseModel):
@@ -29,6 +35,8 @@ def list_links(
     ungrouped: Optional[bool] = None,
     q: Optional[str] = None,
     global_search: Optional[bool] = None,
+    offset: int = 0,
+    limit: int = 50,
     user: User = Depends(_get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -44,10 +52,10 @@ def list_links(
     if q:
         like = f"%{q}%"
         query = query.filter(
-            (Link.title.ilike(like)) | (Link.url.ilike(like)) | (Link.description.ilike(like))
+            (Link.title.ilike(like)) | (Link.url.ilike(like)) | (Link.description.ilike(like)) | (Link.note.ilike(like))
         )
     # Pinned first, then by sort_order, then newest
-    return query.order_by(Link.is_pinned.desc(), Link.sort_order, Link.created_at.desc()).all()
+    return query.order_by(Link.is_pinned.desc(), Link.sort_order, Link.created_at.desc()).offset(offset).limit(limit).all()
 
 
 @router.post("", response_model=LinkOut, status_code=201)
@@ -168,3 +176,97 @@ def find_duplicates(user: User = Depends(_get_current_user), db: Session = Depen
         else:
             seen[url_norm] = {"id": l.id, "title": l.title}
     return {"duplicates": dups, "count": len(dups)}
+
+
+# ── Dead Link Checker ──────────────────────────────
+
+@router.post("/check-health")
+def check_link_health(
+    tab_id: Optional[int] = None,
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Link).filter(Link.user_id == user.id)
+    if tab_id is not None:
+        query = query.filter(Link.tab_id == tab_id)
+    links = query.order_by(Link.id).limit(50).all()
+
+    alive = 0
+    dead = 0
+    redirects = 0
+    checked = 0
+
+    with httpx.Client(timeout=15, follow_redirects=True, verify=False) as client:
+        for link in links:
+            try:
+                resp = client.head(link.url)
+                status = resp.status_code
+            except httpx.HTTPError:
+                status = 0
+
+            link.http_status = status if status else None
+            link.last_checked = datetime.now(timezone.utc)
+            checked += 1
+
+            if status and status < 400:
+                alive += 1
+                if status >= 300:
+                    redirects += 1
+            elif status and status >= 400:
+                dead += 1
+
+            time.sleep(1)
+
+    db.commit()
+    return {"checked": checked, "alive": alive, "dead": dead, "redirects": redirects}
+
+
+@router.get("/dead", response_model=List[LinkOut])
+def get_dead_links(
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    return (
+        db.query(Link)
+        .filter(Link.user_id == user.id, Link.http_status >= 400)
+        .order_by(Link.http_status.desc())
+        .all()
+    )
+
+
+# ── Reader Mode (Content Fetching) ─────────────────
+
+@router.post("/{link_id}/fetch-content")
+def fetch_link_content(
+    link_id: int,
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+
+    try:
+        with httpx.Client(timeout=15, follow_redirects=True, verify=False) as client:
+            resp = client.get(link.url)
+            resp.raise_for_status()
+        html_text = resp.text[:500_000]
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch URL: {e}")
+
+    try:
+        soup = BeautifulSoup(html_text, "html.parser")
+        # Remove script, style, nav, footer, header noise
+        for tag in soup(["script", "style", "noscript", "nav", "footer", "header", "aside"]):
+            tag.decompose()
+        text = soup.get_text(separator="\n", strip=True)
+    except Exception:
+        text = re.sub(r"<[^<]+?>", " ", html_text)
+        text = re.sub(r"\s+", " ", text).strip()
+
+    link.content = text[:500_000]
+    link.content_fetched = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(link)
+
+    return {"content": link.content, "content_fetched": link.content_fetched, "link_id": link.id}

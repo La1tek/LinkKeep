@@ -88,6 +88,8 @@ class LinkUpdate(BaseModel):
     is_pinned: Optional[bool] = None
     note: Optional[str] = None
     sort_order: Optional[int] = None
+    content: Optional[str] = None
+    content_fetched: Optional[datetime] = None
 
 
 class LinkOut(LinkBase):
@@ -95,6 +97,10 @@ class LinkOut(LinkBase):
     sort_order: int
     created_at: datetime
     updated_at: datetime
+    http_status: Optional[int] = None
+    last_checked: Optional[datetime] = None
+    content: Optional[str] = None
+    content_fetched: Optional[datetime] = None
 
     class Config:
         from_attributes = True

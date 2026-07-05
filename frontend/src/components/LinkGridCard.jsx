@@ -1,4 +1,4 @@
-import { Star, DotsThreeVertical, Trash, PencilSimple, PushPin, PushPinSlash, NotePencil, Check, ArrowUpRight } from '@phosphor-icons/react'
+import { Star, DotsThreeVertical, Trash, PencilSimple, PushPin, PushPinSlash, NotePencil, Check, ArrowUpRight, GlobeHemisphereWest } from '@phosphor-icons/react'
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -137,6 +137,11 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
               className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
             >
               <PencilSimple size={13} /> Edit
+            </button>
+            <button onClick={() => { window.open(`https://web.archive.org/web/${encodeURIComponent(link.url)}`, '_blank'); setMenuOpen(false) }}
+              className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
+            >
+              <GlobeHemisphereWest size={13} /> Wayback Machine
             </button>
             <button onClick={() => { onTogglePin?.(link); setMenuOpen(false) }}
               className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}

@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, MagnifyingGlass, Star, Stack, CaretDown, CaretRight, FolderSimple } from '@phosphor-icons/react'
+import { Plus, MagnifyingGlass, Star, Stack, CaretDown, CaretRight, FolderSimple, Clipboard } from '@phosphor-icons/react'
 import { useNavigate } from 'react-router-dom'
 import { useTabStore } from '../hooks/useTabStore'
 import { useLinks } from '../hooks/useLinks'
@@ -36,14 +36,45 @@ export default function Home({ token }) {
   const [newTabOpen, setNewTabOpen] = useState(false)
   const [newTabName, setNewTabName] = useState('')
   const [newTabColor, setNewTabColor] = useState('#6366f1')
+  const [newTabParent, setNewTabParent] = useState(null)
   const [editTabModal, setEditTabModal] = useState(null)
   const [favCount, setFavCount] = useState(0)
   const [allCount, setAllCount] = useState(0)
   const toast = useToast()
+  const [pasting, setPasting] = useState(false)
+  const [homeSort, setHomeSort] = useState('newest')
   const navigate = useNavigate()
 
+  const handlePasteSave = async () => {
+    let url = ''
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        url = await navigator.clipboard.readText()
+      }
+    } catch {}
+    // Fallback: prompt if clipboard unavailable (HTTP without HTTPS)
+    if (!url || !url.trim().startsWith('http')) {
+      url = prompt('Paste URL here:')?.trim() || ''
+    }
+    url = url.trim()
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      toast.error('Invalid URL')
+      return
+    }
+    setPasting(true)
+    toast.success('Saving...')
+    try {
+      await createLink({ url })
+      toast.success('Link saved')
+      refreshLinks()
+    } catch (err) {
+      toast.error(err.message)
+    }
+    setPasting(false)
+  }
+
   // Get all links (for counts and favicons)
-  const { links: allLinks } = useLinks(token, {})
+  const { links: allLinks, create: createLink, refresh: refreshLinks } = useLinks(token, {})
   const safeLinks = allLinks || []
 
   const safeTabs = tabs || []
@@ -66,17 +97,26 @@ export default function Home({ token }) {
     return map
   }, [safeLinks])
 
+  // Only show root-level tabs (no parent)
+  const rootTabs = useMemo(() => safeTabs.filter(t => !t.parent_id), [safeTabs])
+
   // Filter tabs by search
   const filteredTabs = useMemo(() => {
-    if (!search) return safeTabs
-    const q = search.toLowerCase()
-    return safeTabs.filter(t => t.name.toLowerCase().includes(q))
-  }, [safeTabs, search])
+    let list = search ? rootTabs.filter(t => t.name.toLowerCase().includes(search.toLowerCase())) : rootTabs
+    switch (homeSort) {
+      case 'oldest': list = [...list].sort((a, b) => a.id - b.id); break
+      case 'az': list = [...list].sort((a, b) => a.name.localeCompare(b.name)); break
+      case 'za': list = [...list].sort((a, b) => b.name.localeCompare(a.name)); break
+      case 'links': list = [...list].sort((a, b) => (b.total_link_count || 0) - (a.total_link_count || 0)); break
+      default: list = [...list].sort((a, b) => b.id - a.id); break
+    }
+    return list
+  }, [rootTabs, search, homeSort])
 
   const handleCreateTab = () => {
     if (!newTabName.trim()) return
-    createTab({ name: newTabName.trim(), color: newTabColor })
-    setNewTabName(''); setNewTabColor('#6366f1'); setNewTabOpen(false)
+    createTab({ name: newTabName.trim(), color: newTabColor, parent_id: newTabParent })
+    setNewTabName(''); setNewTabColor('#6366f1'); setNewTabParent(null); setNewTabOpen(false)
     toast.success('Folder created')
   }
 
@@ -131,8 +171,16 @@ export default function Home({ token }) {
             <Plus size={18} weight="bold" />
           </button>
         </div>
-        <div className="mt-3">
-          <SearchBar value={search} onChange={setSearch} placeholder="Search folders..." />
+        <div className="mt-3 flex items-center gap-2">
+          <div className="flex-1">
+            <SearchBar value={search} onChange={setSearch} placeholder="Search folders..." />
+          </div>
+          <select value={homeSort} onChange={(e) => setHomeSort(e.target.value)} className="glass text-xs rounded-lg px-2 py-2.5 border-none outline-none cursor-pointer shrink-0" style={{ color: 'var(--text-secondary)' }}>
+            <option value="newest">Newest</option><option value="oldest">Oldest</option><option value="az">A-Z</option><option value="za">Z-A</option><option value="links">By links ↕</option>
+          </select>
+          <button onClick={handlePasteSave} disabled={pasting} className="h-10 w-10 glass rounded-xl active:scale-95 transition-all flex items-center justify-center surface-hover disabled:opacity-40 shrink-0" style={{ color: 'var(--text-muted)' }} title="Paste URL from clipboard">
+            <Clipboard size={18} />
+          </button>
         </div>
       </header>
 
@@ -209,7 +257,7 @@ export default function Home({ token }) {
               />
             ))}
           </motion.div>
-        ) : safeTabs.length > 0 && search ? (
+        ) : rootTabs.length > 0 && search ? (
           <EmptyState
             title="No matching folders"
             subtitle="Try a different search term"
@@ -228,7 +276,7 @@ export default function Home({ token }) {
 
       {/* New folder modal */}
       {newTabOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }} onClick={() => setNewTabOpen(false)}>
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }} onClick={() => { setNewTabParent(null); setNewTabOpen(false) }}>
           <div className="glass rounded-2xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>New Folder</h3>
             <input autoFocus value={newTabName} onChange={(e) => setNewTabName(e.target.value)} placeholder="Folder name..." className="input-base w-full rounded-xl px-4 py-2.5 text-sm outline-none mb-3" onKeyDown={(e) => { if (e.key === 'Enter') handleCreateTab() }} />
@@ -240,6 +288,21 @@ export default function Home({ token }) {
                 ))}
               </div>
             )}
+            {safeTabs.length > 0 && (
+              <div className="mb-4">
+                <label className="text-[10px] block mb-1.5" style={{ color: 'var(--text-muted)' }}>Inside folder:</label>
+                <select
+                  value={newTabParent || ''}
+                  onChange={(e) => setNewTabParent(e.target.value ? Number(e.target.value) : null)}
+                  className="input-base w-full rounded-xl px-4 py-2.5 text-sm outline-none cursor-pointer"
+                >
+                  <option value="">None (root)</option>
+                  {safeTabs.map(t => (
+                    <option key={t.id} value={t.id}>{'  '.repeat((t.parent_id ? 1 : 0))}{t.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex gap-2">
               <button onClick={handleCreateTab} disabled={!newTabName.trim()} className="flex-1 bg-accent-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-accent-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all">Create</button>
               <button onClick={() => setNewTabOpen(false)} className="glass px-4 py-2.5 rounded-xl text-sm surface-hover" style={{ color: 'var(--text-secondary)' }}>Cancel</button>
@@ -248,7 +311,7 @@ export default function Home({ token }) {
         </div>
       )}
 
-      <TabEditModal tab={editTabModal} onClose={() => setEditTabModal(null)} onSave={handleEditTabSave} onDelete={handleEditTabDelete} />
+      <TabEditModal tab={editTabModal} onClose={() => setEditTabModal(null)} onSave={handleEditTabSave} onDelete={handleEditTabDelete} allTabs={safeTabs} />
     </div>
   )
 }

@@ -16,10 +16,11 @@ const ICONS = [
   { name: 'GameController', label: 'Games' },
 ]
 
-export default function TabEditModal({ tab, onClose, onSave, onDelete }) {
+export default function TabEditModal({ tab, onClose, onSave, onDelete, allTabs }) {
   const [name, setName] = useState('')
   const [color, setColor] = useState('#6366f1')
   const [icon, setIcon] = useState('FolderSimple')
+  const [parentId, setParentId] = useState(null)
   const toast = useToast()
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export default function TabEditModal({ tab, onClose, onSave, onDelete }) {
       setName(tab.name || '')
       setColor(tab.color || '#6366f1')
       setIcon(tab.icon || 'FolderSimple')
+      setParentId(tab.parent_id || null)
     }
   }, [tab])
 
@@ -34,8 +36,12 @@ export default function TabEditModal({ tab, onClose, onSave, onDelete }) {
 
   const handleSave = () => {
     if (!name.trim()) { toast.error('Name required'); return }
-    onSave({ name: name.trim(), color, icon })
+    onSave({ name: name.trim(), color, icon, parent_id: parentId })
   }
+
+  // Other tabs that can be a parent (exclude self and children to prevent circular refs)
+  const availableParents = (allTabs || []).filter(t => t.id !== tab.id)
+  const currentParent = availableParents.find(t => t.id === parentId)
 
   const handleDelete = async () => {
     if (tab.link_count > 0) {
@@ -83,6 +89,19 @@ export default function TabEditModal({ tab, onClose, onSave, onDelete }) {
             </button>
           ))}
         </div>
+
+        {/* Parent folder selector */}
+        <label className="text-[10px] font-medium uppercase tracking-wider block mb-2" style={{ color: 'var(--text-muted)' }}>Parent Folder</label>
+        <select
+          value={parentId || ''}
+          onChange={(e) => setParentId(e.target.value ? Number(e.target.value) : null)}
+          className="input-base w-full rounded-xl px-4 py-2.5 text-sm outline-none mb-6 cursor-pointer"
+        >
+          <option value="">None (root level)</option>
+          {availableParents.map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
 
         <div className="flex gap-2">
           <button onClick={handleSave} disabled={!name.trim()} className="flex-1 bg-accent-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-accent-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all">Save</button>

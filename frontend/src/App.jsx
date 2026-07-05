@@ -8,6 +8,7 @@ import Folder from './pages/Folder'
 import Favorites from './pages/Favorites'
 import Settings from './pages/Settings'
 import Search from './pages/Search'
+import Duplicates from './pages/Duplicates'
 import Sidebar from './components/Sidebar'
 import BottomNav from './components/BottomNav'
 import { ToastContainer, useToast } from './components/Toast'
@@ -107,6 +108,7 @@ export default function App() {
               <Route path="/folder/:id" element={<Folder token={token} />} />
               <Route path="/favorites" element={<Favorites token={token} />} />
               <Route path="/search" element={<Search token={token} />} />
+              <Route path="/duplicates" element={<Duplicates token={token} />} />
               <Route path="/settings" element={<Settings user={user} />} />
             </Routes>
           </motion.div>
