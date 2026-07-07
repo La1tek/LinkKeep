@@ -42,6 +42,12 @@
     .sync-result { font-size: 10px; margin-top: 8px; padding: 6px 10px; background: var(--bg); border-radius: var(--radius-sm); display: none; }
     .sync-result.success { color: var(--green); display: block; }
     .sync-result.error { color: var(--red); display: block; }
+    .select { background: var(--bg); border: 1px solid var(--border-subtle); color: var(--text-secondary); border-radius: var(--radius-sm); padding: 6px 8px; font-size: 11px; outline: none; }
+    .sync-actions { display: flex; gap: 8px; }
+    .logs { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-subtle); display: grid; gap: 6px; }
+    .log-item { font-size: 10px; color: var(--text-muted); display: flex; justify-content: space-between; gap: 8px; }
+    .log-item.error { color: var(--red); }
+    .log-item.info { color: var(--text-secondary); }
   </style>
 </head>
 <body>
@@ -65,10 +71,24 @@
         </div>
         <div class="toggle" id="syncToggle"></div>
       </div>
-      <button class="sync-btn" id="syncNowBtn">🔄 Sync Now</button>
+      <div class="row" style="border:none; padding: 0 0 10px 0">
+        <div>
+          <div class="label">Conflict Policy</div>
+          <div class="desc">When browser title differs from LinkKeep</div>
+        </div>
+        <select class="select" id="syncPolicy">
+          <option value="browser_wins">Browser wins</option>
+          <option value="linkkeep_wins">LinkKeep wins</option>
+        </select>
+      </div>
+      <div class="sync-actions">
+        <button class="sync-btn" id="syncNowBtn">🔄 Sync Now</button>
+        <button class="sync-btn" id="dryRunBtn">Dry Run</button>
+      </div>
       <div class="sync-result" id="syncResult"></div>
       <div class="sync-status">
         Last sync: <span class="last-sync" id="lastSync">Never</span>
+        <div class="logs" id="syncLogs"></div>
       </div>
     </div>
 

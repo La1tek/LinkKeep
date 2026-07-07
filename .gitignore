@@ -7,3 +7,5 @@ __pycache__
 data/
 .env
 .DS_Store
+frontend/test-results/
+frontend/playwright-report/
