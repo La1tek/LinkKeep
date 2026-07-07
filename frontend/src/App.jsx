@@ -115,6 +115,19 @@ export default function App() {
     }
   }
 
+  const handleDropLinks = async ({ linkIds, tabId, tabName }) => {
+    const ids = [...new Set((linkIds || []).map(Number).filter(Boolean))]
+    if (!ids.length || !tabId) return
+    try {
+      await api.bulkAction(ids, 'move', Number(tabId))
+      await refreshTabs()
+      window.dispatchEvent(new CustomEvent('linkkeep-links-moved', { detail: { linkIds: ids, tabId: Number(tabId) } }))
+      toast.success(`${ids.length} ${ids.length === 1 ? 'link' : 'links'} moved to ${tabName || 'folder'}`)
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
   return (
     <div className="flex min-h-[100dvh]" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       <Sidebar
@@ -127,6 +140,7 @@ export default function App() {
         onCreateTab={createTab}
         onDeleteTab={handleDeleteTab}
         onUnlockTab={(tab) => setFolderLockModal({ tab, mode: 'unlock' })}
+        onDropLinks={handleDropLinks}
         onLogout={logout}
       />
 

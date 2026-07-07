@@ -1,18 +1,52 @@
 import { motion } from 'framer-motion'
-import { Plus, X, FolderSimple, GearSix, SignOut, Star, Stack, CaretDown, CaretRight, Link as LinkIcon, Sparkle, ShieldCheck, LockKey } from '@phosphor-icons/react'
-import { useState } from 'react'
+import { Plus, X, FolderSimple, GearSix, SignOut, Star, Stack, CaretDown, CaretRight, Link as LinkIcon, Sparkle, ShieldCheck, LockKey, ArrowSquareIn } from '@phosphor-icons/react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AnimatedCounter from './AnimatedCounter'
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4']
 
-export default function Sidebar({ tabs, activePath, adminAvailable = false, onSelectTab, onSelectAll, onSelectFavorites, onCreateTab, onDeleteTab, onUnlockTab, onLogout }) {
+const LINKKEEP_LINKS_MIME = 'application/x-linkkeep-links'
+
+function parseDraggedLinks(event) {
+  const raw = event.dataTransfer.getData(LINKKEEP_LINKS_MIME)
+  if (raw) {
+    try {
+      const payload = JSON.parse(raw)
+      const linkIds = Array.isArray(payload.linkIds) ? payload.linkIds.map(Number).filter(Boolean) : []
+      return linkIds.length ? { ...payload, linkIds } : null
+    } catch {}
+  }
+  const fallback = Number(event.dataTransfer.getData('text/plain'))
+  return fallback ? { linkIds: [fallback] } : null
+}
+
+function hasDraggedLinks(event) {
+  return Array.from(event.dataTransfer?.types || []).includes(LINKKEEP_LINKS_MIME)
+}
+
+export default function Sidebar({ tabs, activePath, adminAvailable = false, onSelectTab, onSelectAll, onSelectFavorites, onCreateTab, onDeleteTab, onUnlockTab, onDropLinks, onLogout }) {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState('#6366f1')
   const [expandedIds, setExpandedIds] = useState(new Set())
+  const [dropTargetId, setDropTargetId] = useState(null)
+  const [dragActive, setDragActive] = useState(false)
   const navigate = useNavigate()
   const safeTabs = tabs || []
+
+  useEffect(() => {
+    const resetDropState = () => {
+      setDropTargetId(null)
+      setDragActive(false)
+    }
+    window.addEventListener('dragend', resetDropState)
+    window.addEventListener('drop', resetDropState)
+    return () => {
+      window.removeEventListener('dragend', resetDropState)
+      window.removeEventListener('drop', resetDropState)
+    }
+  }, [])
 
   const handleCreate = (e) => {
     e.preventDefault()
@@ -54,18 +88,58 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
     const hasChildren = children.length > 0 && !locked
     const isExpanded = expandedIds.has(tab.id)
     const active = isActive(tab.id)
+    const dropActive = dropTargetId === tab.id
+    const canDrop = !locked
+
+    const handleDragEnter = (e) => {
+      if (!hasDraggedLinks(e)) return
+      setDragActive(true)
+      if (canDrop) setDropTargetId(tab.id)
+    }
+
+    const handleDragOver = (e) => {
+      if (!hasDraggedLinks(e)) return
+      e.preventDefault()
+      e.dataTransfer.dropEffect = canDrop ? 'move' : 'none'
+      if (canDrop) setDropTargetId(tab.id)
+    }
+
+    const handleDragLeave = (e) => {
+      if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return
+      if (dropTargetId === tab.id) setDropTargetId(null)
+    }
+
+    const handleDrop = async (e) => {
+      if (!canDrop) return
+      e.preventDefault()
+      e.stopPropagation()
+      const payload = parseDraggedLinks(e)
+      setDropTargetId(null)
+      setDragActive(false)
+      if (!payload?.linkIds?.length) return
+      await onDropLinks?.({ ...payload, tabId: tab.id, tabName: tab.name })
+    }
 
     return (
       <div key={tab.id}>
-        <div className="group relative flex items-center">
+        <div
+          className="group relative flex items-center"
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           <motion.button
             layout
             onClick={() => locked ? onUnlockTab?.(tab) : onSelectTab(tab.id)}
             onDoubleClick={() => { if (hasChildren && !locked) toggleExpand(tab.id) }}
-            className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all surface-hover"
+            className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${dropActive ? 'scale-[1.02]' : ''}`}
             style={{
               paddingLeft: `${12 + depth * 16}px`,
-              background: active ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+              border: dropActive ? '1px dashed rgba(129,140,248,0.78)' : '1px dashed transparent',
+              boxSizing: 'border-box',
+              background: dropActive ? 'rgba(99, 102, 241, 0.18)' : active ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+              boxShadow: dropActive ? '0 10px 24px rgba(99,102,241,0.12)' : 'none',
               color: active ? '#818cf8' : 'var(--text-tertiary)',
             }}
           >
@@ -86,6 +160,7 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
             )}
             <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: tab.color || '#6366f1' }} />
             <span className="truncate">{tab.name}</span>
+            {dropActive && <ArrowSquareIn size={14} weight="fill" className="shrink-0 text-accent-400" />}
             <span className="text-[10px] ml-auto transition-opacity group-hover:opacity-0" style={{ color: 'var(--text-muted)' }}>
               {locked ? 'locked' : <AnimatedCounter value={tab.total_link_count ?? tab.link_count} />}
             </span>
@@ -114,7 +189,15 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
   }
 
   return (
-    <aside className="hidden sm:flex flex-col w-60 shrink-0 h-[100dvh] sticky top-0" style={{ borderRight: '1px solid var(--border-subtle)' }}>
+    <aside
+      className="hidden sm:flex flex-col w-60 shrink-0 h-[100dvh] sticky top-0"
+      style={{ borderRight: '1px solid var(--border-subtle)' }}
+      onDragLeave={(e) => {
+        if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return
+        setDropTargetId(null)
+        setDragActive(false)
+      }}
+    >
       {/* Logo */}
       <button onClick={() => navigate('/')} className="px-5 py-5 flex items-center gap-2.5 group cursor-pointer">
         <div className="h-8 w-8 rounded-xl bg-accent-600 flex items-center justify-center transition-transform group-hover:scale-105">
@@ -214,6 +297,11 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
         <div className="my-2" style={{ borderTop: '1px solid var(--border-subtle)' }} />
 
         {/* Folders */}
+        {dragActive && (
+          <div className="mx-1 mb-2 rounded-xl px-3 py-2 text-[11px] border border-dashed border-accent-500/40 bg-accent-500/10 text-accent-300">
+            Drop onto a folder to move
+          </div>
+        )}
         {rootTabs.map(tab => renderTab(tab))}
 
         {/* New folder button */}

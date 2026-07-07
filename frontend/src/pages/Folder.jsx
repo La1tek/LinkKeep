@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, ArrowLeft, PushPin, CheckSquare, X, Trash, MagnifyingGlass, ListBullets, SquaresFour, FolderPlus, CaretRight, BookOpen, ArrowUpRight, Clipboard, LockKey } from '@phosphor-icons/react'
+import { Plus, ArrowLeft, PushPin, CheckSquare, X, Trash, MagnifyingGlass, ListBullets, SquaresFour, FolderPlus, CaretRight, BookOpen, ArrowUpRight, Clipboard, LockKey, ArrowSquareIn } from '@phosphor-icons/react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTabStore } from '../hooks/useTabStore'
 import { useLinks } from '../hooks/useLinks'
@@ -26,6 +26,44 @@ const staggerContainer = {
 const staggerItem = {
   hidden: { opacity: 0, y: 12, scale: 0.98 },
   show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } }
+}
+
+const LINKKEEP_LINKS_MIME = 'application/x-linkkeep-links'
+
+function createDragPreview({ count, title }) {
+  const node = document.createElement('div')
+  node.style.position = 'fixed'
+  node.style.top = '-120px'
+  node.style.left = '-120px'
+  node.style.zIndex = '9999'
+  node.style.pointerEvents = 'none'
+  node.style.padding = '10px 12px'
+  node.style.borderRadius = '14px'
+  node.style.background = 'rgba(24, 24, 27, 0.92)'
+  node.style.color = 'white'
+  node.style.boxShadow = '0 18px 40px rgba(0,0,0,0.24)'
+  node.style.border = '1px solid rgba(255,255,255,0.14)'
+  node.style.font = '600 12px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
+  node.textContent = count > 1 ? `${count} links` : title || 'Move link'
+  document.body.appendChild(node)
+  return node
+}
+
+function parseDraggedLinks(event) {
+  const raw = event.dataTransfer.getData(LINKKEEP_LINKS_MIME)
+  if (raw) {
+    try {
+      const payload = JSON.parse(raw)
+      const linkIds = Array.isArray(payload.linkIds) ? payload.linkIds.map(Number).filter(Boolean) : []
+      return linkIds.length ? { ...payload, linkIds } : null
+    } catch {}
+  }
+  const fallback = Number(event.dataTransfer.getData('text/plain'))
+  return fallback ? { linkIds: [fallback] } : null
+}
+
+function hasDraggedLinks(event) {
+  return Array.from(event.dataTransfer?.types || []).includes(LINKKEEP_LINKS_MIME)
 }
 
 function throttle(fn, ms) {
@@ -62,7 +100,9 @@ export default function Folder({ token }) {
   const [healthChecking, setHealthChecking] = useState(false)
   const [healthResult, setHealthResult] = useState(null)
   const [draggedLinkId, setDraggedLinkId] = useState(null)
+  const [draggingLinkIds, setDraggingLinkIds] = useState([])
   const [dragOverLinkId, setDragOverLinkId] = useState(null)
+  const [dropFolderId, setDropFolderId] = useState(null)
   const [archiveLink, setArchiveLink] = useState(null)
   const [folderLockModal, setFolderLockModal] = useState(null)
   const touchStartY = useRef(0)
@@ -94,6 +134,21 @@ export default function Folder({ token }) {
 
   const { links, loading, create: createLink, update: updateLink, remove: deleteLink, toggleFav, refresh } = useLinks(token, linkParams)
   const rawLinks = links || []
+
+  useEffect(() => {
+    const onLinksMoved = () => {
+      refresh()
+      refreshTabs()
+      setSelectedIds([])
+      setSelectionMode(false)
+      setDraggedLinkId(null)
+      setDraggingLinkIds([])
+      setDragOverLinkId(null)
+      setDropFolderId(null)
+    }
+    window.addEventListener('linkkeep-links-moved', onLinksMoved)
+    return () => window.removeEventListener('linkkeep-links-moved', onLinksMoved)
+  }, [refresh, refreshTabs])
 
   const allTags = useMemo(() => {
     const s = new Set()
@@ -226,6 +281,22 @@ export default function Folder({ token }) {
     toast.success('Links moved')
   }
 
+  const handleDropLinksToTab = async ({ linkIds, tabId, tabName }) => {
+    const ids = [...new Set((linkIds || []).map(Number).filter(Boolean))]
+    if (!ids.length || !tabId) return
+    try {
+      await api.bulkAction(ids, 'move', Number(tabId))
+      setSelectedIds([])
+      setSelectionMode(false)
+      setDropFolderId(null)
+      refresh()
+      refreshTabs()
+      toast.success(`${ids.length} ${ids.length === 1 ? 'link' : 'links'} moved to ${tabName || 'folder'}`)
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
   // Pull-to-refresh
   const handleTouchStart = (e) => {
     if (window.scrollY === 0) { touchStartY.current = e.touches[0].clientY; setPulling(true) }
@@ -343,15 +414,26 @@ export default function Folder({ token }) {
   }
 
   const dragHandlers = (link, section) => ({
-    draggable: !selectionMode,
+    draggable: true,
     onDragStart: (e) => {
-      if (selectionMode) return
+      const linkIds = selectionMode && selectedIds.includes(link.id) ? selectedIds : [link.id]
+      const uniqueLinkIds = [...new Set(linkIds.map(Number).filter(Boolean))]
       e.dataTransfer.effectAllowed = 'move'
       e.dataTransfer.setData('text/plain', String(link.id))
+      e.dataTransfer.setData(LINKKEEP_LINKS_MIME, JSON.stringify({
+        type: 'linkkeep-links',
+        linkIds: uniqueLinkIds,
+        sourceTabId: link.tab_id ?? null,
+      }))
+      const preview = createDragPreview({ count: uniqueLinkIds.length, title: link.title })
+      e.dataTransfer.setDragImage(preview, 12, 12)
+      setTimeout(() => preview.remove(), 0)
       setDraggedLinkId(link.id)
+      setDraggingLinkIds(uniqueLinkIds)
     },
     onDragOver: (e) => {
       if (!draggedLinkId || draggedLinkId === link.id) return
+      if (draggingLinkIds.length > 1) return
       e.preventDefault()
       e.dataTransfer.dropEffect = 'move'
       setDragOverLinkId(link.id)
@@ -361,14 +443,26 @@ export default function Folder({ token }) {
     },
     onDrop: async (e) => {
       e.preventDefault()
-      const sourceId = Number(e.dataTransfer.getData('text/plain')) || draggedLinkId
+      const payload = parseDraggedLinks(e)
+      if (payload?.linkIds?.length !== 1) {
+        setDragOverLinkId(null)
+        setDraggedLinkId(null)
+        setDraggingLinkIds([])
+        setDropFolderId(null)
+        return
+      }
+      const sourceId = payload.linkIds[0] || Number(e.dataTransfer.getData('text/plain')) || draggedLinkId
       setDragOverLinkId(null)
       setDraggedLinkId(null)
+      setDraggingLinkIds([])
+      setDropFolderId(null)
       await handleReorderLinks(sourceId, link.id, section)
     },
     onDragEnd: () => {
       setDraggedLinkId(null)
+      setDraggingLinkIds([])
       setDragOverLinkId(null)
+      setDropFolderId(null)
     },
   })
 
@@ -384,11 +478,24 @@ export default function Folder({ token }) {
 
   const isGrid = viewMode === 'grid'
 
+  const linkShellStyle = (link) => {
+    const dragging = draggingLinkIds.includes(link.id)
+    const over = dragOverLinkId === link.id
+    return {
+      border: dragging ? '1px dashed rgba(129,140,248,0.72)' : '1px solid transparent',
+      outline: over ? '2px dashed rgba(129,140,248,0.82)' : 'none',
+      outlineOffset: over ? '4px' : '0px',
+      background: dragging ? 'rgba(99,102,241,0.04)' : undefined,
+      boxSizing: 'border-box',
+    }
+  }
+
   const renderLinkList = (section) => (link, i) => (
     <motion.div
       key={link.id}
       variants={staggerItem}
-      className={`link-card-shell rounded-2xl ${draggedLinkId === link.id ? 'opacity-50' : ''} ${dragOverLinkId === link.id ? 'ring-2 ring-accent-500/50' : ''}`}
+      className={`link-card-shell rounded-2xl ${draggingLinkIds.includes(link.id) ? 'opacity-50 scale-[0.99]' : ''} ${dragOverLinkId === link.id ? 'ring-2 ring-accent-500/50 shadow-lg shadow-accent-500/10' : ''}`}
+      style={linkShellStyle(link)}
       {...dragHandlers(link, section)}
     >
       <LinkCard
@@ -411,7 +518,8 @@ export default function Folder({ token }) {
     <motion.div
       key={link.id}
       variants={staggerItem}
-      className={`link-card-shell rounded-2xl ${draggedLinkId === link.id ? 'opacity-50' : ''} ${dragOverLinkId === link.id ? 'ring-2 ring-accent-500/50' : ''}`}
+      className={`link-card-shell rounded-2xl ${draggingLinkIds.includes(link.id) ? 'opacity-50 scale-[0.99]' : ''} ${dragOverLinkId === link.id ? 'ring-2 ring-accent-500/50 shadow-lg shadow-accent-500/10' : ''}`}
+      style={linkShellStyle(link)}
       {...dragHandlers(link, section)}
     >
       <LinkGridCard
@@ -571,20 +679,54 @@ export default function Folder({ token }) {
               {childTabs.map(child => {
                 const childColor = child.color || '#6366f1'
                 const childLinks = child.total_link_count ?? child.link_count ?? 0
+                const childLocked = child.is_locked && !child.is_unlocked
+                const childDropActive = dropFolderId === child.id
+                const childDropHandlers = {
+                  onDragEnter: (e) => {
+                    if (!hasDraggedLinks(e)) return
+                    if (!childLocked) setDropFolderId(child.id)
+                  },
+                  onDragOver: (e) => {
+                    if (!hasDraggedLinks(e)) return
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = childLocked ? 'none' : 'move'
+                    if (!childLocked) setDropFolderId(child.id)
+                  },
+                  onDragLeave: (e) => {
+                    if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return
+                    if (dropFolderId === child.id) setDropFolderId(null)
+                  },
+                  onDrop: async (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setDropFolderId(null)
+                    if (childLocked) return
+                    const payload = parseDraggedLinks(e)
+                    if (!payload?.linkIds?.length) return
+                    await handleDropLinksToTab({ ...payload, tabId: child.id, tabName: child.name })
+                  },
+                }
                 return (
                   <motion.button
                     key={child.id}
                     whileHover={{ y: -1 }}
                     whileTap={{ scale: 0.97 }}
-                    onClick={() => child.is_locked && !child.is_unlocked ? setFolderLockModal({ tab: child, mode: 'unlock' }) : navigate(`/folder/${child.id}`)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs glass transition-all hover:shadow-md"
-                    style={{ border: `1px solid ${childColor}25` }}
+                    onClick={() => childLocked ? setFolderLockModal({ tab: child, mode: 'unlock' }) : navigate(`/folder/${child.id}`)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs glass transition-all hover:shadow-md ${childDropActive ? 'scale-[1.03]' : ''}`}
+                    style={{
+                      border: `1px solid ${childDropActive ? childColor : `${childColor}25`}`,
+                      borderStyle: childDropActive ? 'dashed' : 'solid',
+                      background: childDropActive ? `${childColor}18` : undefined,
+                      boxShadow: childDropActive ? `0 12px 28px ${childColor}20` : undefined,
+                    }}
+                    {...childDropHandlers}
                   >
                     <div className="h-5 w-5 rounded-lg flex items-center justify-center" style={{ background: `${childColor}20` }}>
-                      {child.is_locked && !child.is_unlocked ? <LockKey size={11} weight="fill" style={{ color: childColor }} /> : <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: childColor }} />}
+                      {childLocked ? <LockKey size={11} weight="fill" style={{ color: childColor }} /> : <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: childColor }} />}
                     </div>
                     <span className="font-medium truncate max-w-[120px]" style={{ color: 'var(--text-primary)' }}>{child.name}</span>
                     <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{childLinks}</span>
+                    {childDropActive && <ArrowSquareIn size={12} weight="fill" style={{ color: childColor }} />}
                     {child.child_count > 0 && (
                       <CaretRight size={10} weight="bold" style={{ color: 'var(--text-muted)' }} />
                     )}
