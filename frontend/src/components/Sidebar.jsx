@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Plus, X, FolderSimple, GearSix, SignOut, Star, Stack, CaretDown, CaretRight } from '@phosphor-icons/react'
+import { Plus, X, FolderSimple, GearSix, SignOut, Star, Stack, CaretDown, CaretRight, Link as LinkIcon, Sparkle, ShieldCheck } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AnimatedCounter from './AnimatedCounter'
@@ -34,6 +34,9 @@ export default function Sidebar({ tabs, activePath, onSelectTab, onSelectAll, on
   const isAllActive = activePath === '/folder/all'
   const isHomeActive = activePath === '/'
   const isFavActive = activePath === '/favorites'
+  const isSharesActive = activePath === '/shares'
+  const isRecommendationsActive = activePath === '/recommendations'
+  const isAdminActive = activePath === '/admin'
 
   // Build tree: root tabs (no parent) and children
   const rootTabs = safeTabs.filter(t => !t.parent_id)
@@ -71,6 +74,7 @@ export default function Sidebar({ tabs, activePath, onSelectTab, onSelectAll, on
                 onClick={(e) => { e.stopPropagation(); toggleExpand(tab.id) }}
                 className="p-0 shrink-0"
                 style={{ color: 'var(--text-muted)' }}
+                aria-label={isExpanded ? `Collapse ${tab.name}` : `Expand ${tab.name}`}
               >
                 {isExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
               </button>
@@ -87,6 +91,7 @@ export default function Sidebar({ tabs, activePath, onSelectTab, onSelectAll, on
             onClick={() => onDeleteTab(tab.id)}
             className="hidden group-hover:block absolute right-2 top-1/2 -translate-y-1/2 p-1 transition-all hover:text-red-400"
             style={{ color: 'var(--text-muted)' }}
+            aria-label={`Delete ${tab.name}`}
           >
             <X size={12} />
           </button>
@@ -162,6 +167,47 @@ export default function Sidebar({ tabs, activePath, onSelectTab, onSelectAll, on
         {/* Divider */}
         <div className="my-2" style={{ borderTop: '1px solid var(--border-subtle)' }} />
 
+        <motion.button
+          layout
+          onClick={() => navigate('/shares')}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover"
+          style={{
+            background: isSharesActive ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+            color: isSharesActive ? '#818cf8' : 'var(--text-tertiary)',
+          }}
+        >
+          <LinkIcon size={16} />
+          <span>Shared</span>
+        </motion.button>
+
+        <motion.button
+          layout
+          onClick={() => navigate('/recommendations')}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover"
+          style={{
+            background: isRecommendationsActive ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+            color: isRecommendationsActive ? '#818cf8' : 'var(--text-tertiary)',
+          }}
+        >
+          <Sparkle size={16} />
+          <span>Recommendations</span>
+        </motion.button>
+
+        <motion.button
+          layout
+          onClick={() => navigate('/admin')}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover"
+          style={{
+            background: isAdminActive ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+            color: isAdminActive ? '#818cf8' : 'var(--text-tertiary)',
+          }}
+        >
+          <ShieldCheck size={16} />
+          <span>Admin</span>
+        </motion.button>
+
+        <div className="my-2" style={{ borderTop: '1px solid var(--border-subtle)' }} />
+
         {/* Folders */}
         {rootTabs.map(tab => renderTab(tab))}
 
@@ -183,6 +229,7 @@ export default function Sidebar({ tabs, activePath, onSelectTab, onSelectAll, on
                   <button key={c} type="button" onClick={() => setNewColor(c)}
                     className={`h-4 w-4 rounded-full transition-transform ${newColor === c ? 'scale-125 ring-2 ring-white/20' : ''}`}
                     style={{ backgroundColor: c }}
+                    aria-label={`Use color ${c}`}
                   />
                 ))}
               </div>

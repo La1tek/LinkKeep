@@ -1,5 +1,5 @@
-const CACHE_NAME = 'linkkeep-v2'
-const STATIC_ASSETS = ['/']
+const CACHE_NAME = 'linkkeep-v3'
+const STATIC_ASSETS = ['/', '/manifest.json']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -31,7 +31,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone))
         }
         return response
-      }).catch(() => cached)
+      }).catch(() => cached || caches.match('/'))
       return cached || fetchPromise
     })
   )

@@ -9,6 +9,10 @@ import Favorites from './pages/Favorites'
 import Settings from './pages/Settings'
 import Search from './pages/Search'
 import Duplicates from './pages/Duplicates'
+import Shares from './pages/Shares'
+import Recommendations from './pages/Recommendations'
+import Admin from './pages/Admin'
+import PublicShare from './pages/PublicShare'
 import Sidebar from './components/Sidebar'
 import BottomNav from './components/BottomNav'
 import { ToastContainer, useToast } from './components/Toast'
@@ -39,6 +43,13 @@ export default function App() {
   useEffect(() => {
     if (token) refreshTabs()
   }, [token, refreshTabs])
+
+  if (location.pathname.startsWith('/share/')) return (
+    <>
+      <PublicShare />
+      <ToastContainer />
+    </>
+  )
 
   if (!token) return (
     <>
@@ -109,6 +120,9 @@ export default function App() {
               <Route path="/favorites" element={<Favorites token={token} />} />
               <Route path="/search" element={<Search token={token} />} />
               <Route path="/duplicates" element={<Duplicates token={token} />} />
+              <Route path="/shares" element={<Shares />} />
+              <Route path="/recommendations" element={<Recommendations />} />
+              <Route path="/admin" element={<Admin />} />
               <Route path="/settings" element={<Settings user={user} />} />
             </Routes>
           </motion.div>

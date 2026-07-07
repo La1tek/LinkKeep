@@ -40,6 +40,15 @@ async function mockAuthedApi(page) {
   await page.route('**/api/tags', async (route) => {
     await route.fulfill({ json: { tags: [{ name: 'docs', count: 2 }] } })
   })
+  await page.route('**/api/settings/snapshots', async (route) => {
+    await route.fulfill({ json: { snapshots: [{ id: 1, name: 'Daily', created_at: '2026-07-07T00:00:00Z' }] } })
+  })
+  await page.route('**/api/jobs', async (route) => {
+    await route.fulfill({ json: { jobs: [{ id: 1, type: 'backup_snapshot', status: 'succeeded', created_at: '2026-07-07T00:00:00Z' }] } })
+  })
+  await page.route('**/api/admin/overview', async (route) => {
+    await route.fulfill({ status: 403, json: { detail: 'Admin access required' } })
+  })
 }
 
 test('registers and opens the library', async ({ page }) => {
@@ -48,8 +57,8 @@ test('registers and opens the library', async ({ page }) => {
 
   await expect(page.getByRole('heading', { name: 'LinkKeep' })).toBeVisible()
   await page.getByRole('button', { name: /register/i }).click()
-  await page.getByPlaceholder('your_username').fill('demo')
-  await page.getByPlaceholder('••••••••').fill('secret123')
+  await page.getByLabel('Username').fill('demo')
+  await page.getByLabel('Password').fill('secret123')
   await page.getByRole('button', { name: /create account/i }).click()
 
   await expect(page.getByRole('heading', { name: 'My Library' })).toBeVisible()
@@ -68,5 +77,22 @@ test('shows sessions, import mode and tag management in settings', async ({ page
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
   await expect(page.getByText('Playwright')).toBeVisible()
   await expect(page.getByText('Import Mode')).toBeVisible()
+  await expect(page.getByText('Daily')).toBeVisible()
   await expect(page.getByText('docs')).toBeVisible()
+})
+
+test('opens a public share without auth', async ({ page }) => {
+  await page.route('**/api/public/shares/share-token', async (route) => {
+    await route.fulfill({
+      json: {
+        title: 'Public collection',
+        owner: 'demo',
+        links: [{ id: 1, title: 'Shared link', url: 'https://shared.example.com', tags: [] }],
+      },
+    })
+  })
+
+  await page.goto('/share/share-token')
+  await expect(page.getByRole('heading', { name: 'Public collection' })).toBeVisible()
+  await expect(page.getByText('Shared link')).toBeVisible()
 })
