@@ -1,6 +1,6 @@
 # LinkKeep v2.4
 
-Self-hosted link manager with folders, tags, favorites, search, browser extension, and optional Telegram link intake.
+Self-hosted link manager with folders, tags, favorites, full-text search, public shared collections, backups, browser extension, PWA support, and optional Telegram link intake.
 
 ## Stack
 
@@ -31,6 +31,16 @@ For local unpacked install, load the `extension/` directory in `chrome://extensi
 
 The server build also publishes a downloadable zip at `/LinkKeep-extension.zip`.
 
+## Product Features
+
+- Public shared collections at `/share/{token}`
+- Full-text search index with manual rebuild and background job support
+- Backup snapshots with restore modes and retention
+- Imports from LinkKeep JSON, browser bookmarks HTML, Pocket JSON, and Raindrop CSV
+- Recommendations for autotags, stale links, and dead links
+- Admin overview when `ADMIN_USERNAMES` contains the current username
+- PWA install/offline shell caching
+
 ## Development
 
 Backend:
@@ -48,6 +58,7 @@ Useful root commands:
 make migrate
 make check
 make package-extension
+make release
 ```
 
 Frontend:
