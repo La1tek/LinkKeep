@@ -11,13 +11,14 @@ import { openConfirm } from '../components/ConfirmModal'
 export default function Settings({ user }) {
   const navigate = useNavigate()
   const { theme, toggle } = useTheme()
-  const { logout } = useAuth()
+  const { logout, setUser } = useAuth()
   const toast = useToast()
   const [editing, setEditing] = useState(null)
   const [newUsername, setNewUsername] = useState(user?.username || '')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [botStatus, setBotStatus] = useState(null)
+  const [botCommand, setBotCommand] = useState('')
 
   useEffect(() => {
     api.getStats().then(() => {
@@ -30,10 +31,9 @@ export default function Settings({ user }) {
   const handleChangeUsername = async (e) => {
     e.preventDefault()
     try {
-      await api.changeUsername(newUsername)
+      const updated = await api.changeUsername(newUsername)
       toast.success('Username updated'); setEditing(null)
-      localStorage.setItem('lk_user', JSON.stringify({ ...user, username: newUsername }))
-      window.location.reload()
+      setUser(updated)
     } catch (err) { toast.error(err.message) }
   }
 
@@ -84,6 +84,16 @@ export default function Settings({ user }) {
     if (!ok) return
     try { await api.deleteAccount(); toast.success('Account deleted'); setTimeout(() => { logout(); window.location.reload() }, 1000) }
     catch (err) { toast.error(err.message) }
+  }
+
+  const handleCreateBotToken = async () => {
+    try {
+      const result = await api.createBotToken()
+      setBotCommand(result.command)
+      toast.success('Telegram link token generated')
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   return (
@@ -168,8 +178,12 @@ export default function Settings({ user }) {
                 <li>Create a bot via <span style={{ color: 'var(--text-tertiary)' }}>@BotFather</span> on Telegram</li>
                 <li>Set <code className="px-1 py-0.5 rounded surface text-[10px]">TELEGRAM_BOT_TOKEN</code> in server .env</li>
                 <li>Restart backend</li>
-                <li>Message your bot: <code className="px-1 py-0.5 rounded surface text-[10px]">/start username password</code></li>
+                <li>Generate a link token and message your bot with it</li>
               </ol>
+              <button onClick={handleCreateBotToken} className="mt-2 bg-accent-600 text-white px-3 py-2 rounded-xl text-xs font-medium hover:bg-accent-500 transition-all">Generate Link Token</button>
+              {botCommand && (
+                <code className="block mt-2 px-2 py-1.5 rounded surface text-[10px] break-all">{botCommand}</code>
+              )}
               <p className="pt-1">Then just send URLs to the bot to save them.</p>
             </div>
           </div>
@@ -192,7 +206,7 @@ export default function Settings({ user }) {
 
         <Section title="About">
           <div className="glass rounded-2xl p-4 space-y-2">
-            <Row label="Version" value="2.2.0" mono />
+            <Row label="Version" value="2.4.0" mono />
             <Row label="Stack" value="FastAPI + React + Vite" />
             <a href="https://github.com/La1tek/LinkKeep" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-accent-400 hover:text-accent-300 pt-1"><GithubLogo size={14} />github.com/La1tek/LinkKeep</a>
           </div>

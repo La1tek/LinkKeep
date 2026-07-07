@@ -1,13 +1,33 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Any
 from datetime import datetime
+import re
+
+
+def _validate_http_url(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return value
+    value = value.strip()
+    if not value:
+        raise ValueError("URL is required")
+    if not (value.startswith("http://") or value.startswith("https://")):
+        raise ValueError("Only http and https URLs are allowed")
+    return value
+
+
+def _validate_color(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return value
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+        raise ValueError("Color must be a hex value like #6366f1")
+    return value
 
 
 # ── Auth ────────────────────────────────────────────
 
 class UserCreate(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=4, max_length=256)
 
 
 class UserOut(BaseModel):
@@ -27,9 +47,14 @@ class Token(BaseModel):
 # ── Tab ──────────────────────────────────────────────
 
 class TabBase(BaseModel):
-    name: str
-    icon: Optional[str] = "FolderSimple"
+    name: str = Field(min_length=1, max_length=128)
+    icon: Optional[str] = Field(default="FolderSimple", max_length=64)
     color: Optional[str] = "#6366f1"
+
+    @field_validator("color")
+    @classmethod
+    def validate_color(cls, value: Optional[str]) -> Optional[str]:
+        return _validate_color(value)
 
 
 class TabCreate(TabBase):
@@ -37,11 +62,16 @@ class TabCreate(TabBase):
 
 
 class TabUpdate(BaseModel):
-    name: Optional[str] = None
-    icon: Optional[str] = None
+    name: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    icon: Optional[str] = Field(default=None, max_length=64)
     color: Optional[str] = None
     sort_order: Optional[int] = None
     parent_id: Optional[int] = None
+
+    @field_validator("color")
+    @classmethod
+    def validate_color(cls, value: Optional[str]) -> Optional[str]:
+        return _validate_color(value)
 
 
 class TabOut(TabBase):
@@ -60,16 +90,21 @@ class TabOut(TabBase):
 # ── Link ─────────────────────────────────────────────
 
 class LinkBase(BaseModel):
-    title: str
+    title: str = Field(min_length=1, max_length=256)
     url: str
     description: Optional[str] = None
     favicon: Optional[str] = None
     image: Optional[str] = None
     tab_id: Optional[int] = None
-    tags: List[str] = []
+    tags: List[str] = Field(default_factory=list)
     is_favorite: bool = False
     is_pinned: bool = False
     note: Optional[str] = None
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value: str) -> str:
+        return _validate_http_url(value)
 
 
 class LinkCreate(LinkBase):
@@ -77,7 +112,7 @@ class LinkCreate(LinkBase):
 
 
 class LinkUpdate(BaseModel):
-    title: Optional[str] = None
+    title: Optional[str] = Field(default=None, min_length=1, max_length=256)
     url: Optional[str] = None
     description: Optional[str] = None
     favicon: Optional[str] = None
@@ -90,6 +125,11 @@ class LinkUpdate(BaseModel):
     sort_order: Optional[int] = None
     content: Optional[str] = None
     content_fetched: Optional[datetime] = None
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value: Optional[str]) -> Optional[str]:
+        return _validate_http_url(value)
 
 
 class LinkOut(LinkBase):
@@ -138,7 +178,7 @@ class StatsOut(BaseModel):
     total_tabs: int
     total_favorites: int
     total_pinned: int
-    recent_links: List[LinkOut] = []
+    recent_links: List[LinkOut] = Field(default_factory=list)
 
 
 # ── Bot ──────────────────────────────────────────────

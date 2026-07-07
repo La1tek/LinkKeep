@@ -157,6 +157,17 @@ class TestTabs:
         child = client.post("/api/tabs", json={"name": "Child", "parent_id": parent["id"]}, headers=auth_user).json()
         assert child["parent_id"] == parent["id"]
 
+    def test_cannot_create_tab_under_other_users_parent(self, client, auth_user, second_user):
+        parent = client.post("/api/tabs", json={"name": "OtherParent"}, headers=second_user).json()
+        resp = client.post("/api/tabs", json={"name": "Child", "parent_id": parent["id"]}, headers=auth_user)
+        assert resp.status_code == 404
+
+    def test_cannot_create_parent_cycle(self, client, auth_user):
+        parent = client.post("/api/tabs", json={"name": "Parent"}, headers=auth_user).json()
+        child = client.post("/api/tabs", json={"name": "Child", "parent_id": parent["id"]}, headers=auth_user).json()
+        resp = client.put(f"/api/tabs/{parent['id']}", json={"parent_id": child["id"]}, headers=auth_user)
+        assert resp.status_code == 400
+
 
 # ── Link Tests ───────────────────────────────────────
 
@@ -247,6 +258,17 @@ class TestLinks:
         resp = client.get("/api/links", headers=second_user)
         assert len(resp.json()) == 0
 
+    def test_cannot_create_link_in_other_users_tab(self, client, auth_user, second_user):
+        tab = client.post("/api/tabs", json={"name": "OtherTab"}, headers=second_user).json()
+        resp = client.post("/api/links", json={"title": "Bad", "url": "https://x.com", "tab_id": tab["id"]}, headers=auth_user)
+        assert resp.status_code == 404
+
+    def test_cannot_update_link_to_other_users_tab(self, client, auth_user, second_user):
+        link = client.post("/api/links", json={"title": "Mine", "url": "https://x.com"}, headers=auth_user).json()
+        other_tab = client.post("/api/tabs", json={"name": "OtherTab"}, headers=second_user).json()
+        resp = client.put(f"/api/links/{link['id']}", json={"tab_id": other_tab["id"]}, headers=auth_user)
+        assert resp.status_code == 404
+
 
 # ── Pin Tests (v2.2) ────────────────────────────────
 
@@ -295,6 +317,12 @@ class TestBulk:
         assert resp.json()["affected"] == 2
         links = client.get(f"/api/links?tab_id={tab['id']}", headers=auth_user)
         assert len(links.json()) == 2
+
+    def test_bulk_move_rejects_other_users_tab(self, client, auth_user, second_user):
+        other_tab = client.post("/api/tabs", json={"name": "Other"}, headers=second_user).json()
+        link = client.post("/api/links", json={"title": "L", "url": "https://1.com"}, headers=auth_user).json()
+        resp = client.post("/api/links/bulk", json={"link_ids": [link["id"]], "action": "move", "tab_id": other_tab["id"]}, headers=auth_user)
+        assert resp.status_code == 404
 
     def test_bulk_pin(self, client, auth_user):
         l1 = client.post("/api/links", json={"title": "L1", "url": "https://1.com"}, headers=auth_user).json()
@@ -352,3 +380,34 @@ class TestHealth:
         assert data["status"] == "ok"
         assert "version" in data
         assert "bot" in data
+
+
+class TestSettings:
+    def test_change_username_keeps_current_token_valid(self, client, auth_user):
+        resp = client.put("/api/settings/username", json={"new_username": "renamed"}, headers=auth_user)
+        assert resp.status_code == 200
+        me = client.get("/api/auth/me", headers=auth_user)
+        assert me.status_code == 200
+        assert me.json()["username"] == "renamed"
+
+    def test_export_html_escapes_user_content(self, client, auth_user):
+        client.post("/api/tabs", json={"name": "<script>alert(1)</script>"}, headers=auth_user)
+        client.post("/api/links", json={"title": "<b>x</b>", "url": "https://x.com/?a=<b>"}, headers=auth_user)
+        resp = client.get("/api/settings/export-html", headers=auth_user)
+        assert resp.status_code == 200
+        assert "<script>alert(1)</script>" not in resp.text
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in resp.text
+        assert "&lt;b&gt;x&lt;/b&gt;" in resp.text
+
+    def test_create_bot_token_returns_start_command(self, client, auth_user):
+        resp = client.post("/api/settings/bot-token", headers=auth_user)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["token"]
+        assert data["command"] == f"/start {data['token']}"
+
+
+class TestMetadataSecurity:
+    def test_metadata_rejects_localhost_url(self, client, auth_user):
+        resp = client.post("/api/metadata", json={"url": "http://127.0.0.1:8000/private"}, headers=auth_user)
+        assert resp.status_code == 400

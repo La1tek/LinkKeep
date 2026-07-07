@@ -80,7 +80,7 @@ export default function Search({ token }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {processedLinks.map((link, i) => (
               <LinkCard key={link.id} link={link} index={i}
-                onEdit={(l) => { setEditingLink(l); setModalOpen(true) }}
+                onEdit={async (l) => { if (l._inlineUpdate) { await update(l.id, l._inlineUpdate); toast.success('Link updated'); return } setEditingLink(l); setModalOpen(true) }}
                 onDelete={handleDelete}
                 onToggleFav={(l) => { toggleFav(l.id); toast.success(l.is_favorite ? 'Removed from favorites' : 'Added to favorites') }}
               />

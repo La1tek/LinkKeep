@@ -81,6 +81,7 @@ export const api = {
   exportData: () => request('/settings/export'),
   importData: (data) => request('/settings/import', { method: 'POST', body: data }),
   deleteAccount: () => request('/settings/account', { method: 'DELETE' }),
+  createBotToken: () => request('/settings/bot-token', { method: 'POST' }),
 
   // Duplicates
   findDuplicates: () => request('/links/duplicates'),

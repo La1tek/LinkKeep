@@ -9,6 +9,7 @@ from app.schemas import (
     BulkLinkAction, BulkResult,
 )
 from app.routers.auth import _get_current_user
+from app.services.link_service import validate_public_http_url
 
 from pydantic import BaseModel
 import time
@@ -35,8 +36,8 @@ def list_links(
     ungrouped: Optional[bool] = None,
     q: Optional[str] = None,
     global_search: Optional[bool] = None,
-    offset: int = 0,
-    limit: int = 50,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
     user: User = Depends(_get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -90,7 +91,12 @@ def update_link(link_id: int, data: LinkUpdate, user: User = Depends(_get_curren
     link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id).first()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
-    for field, value in data.model_dump(exclude_unset=True).items():
+    update_data = data.model_dump(exclude_unset=True)
+    if "tab_id" in update_data and update_data["tab_id"] is not None:
+        tab = db.query(Tab).filter(Tab.id == update_data["tab_id"], Tab.user_id == user.id).first()
+        if not tab:
+            raise HTTPException(status_code=404, detail="Tab not found")
+    for field, value in update_data.items():
         setattr(link, field, value)
     db.commit()
     db.refresh(link)
@@ -130,12 +136,21 @@ def toggle_pin(link_id: int, user: User = Depends(_get_current_user), db: Sessio
 
 @router.post("/bulk", response_model=BulkResult)
 def bulk_action(action: BulkLinkAction, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    allowed_actions = {"delete", "move", "pin", "unpin", "favorite", "unfavorite"}
+    if action.action not in allowed_actions:
+        raise HTTPException(status_code=400, detail="Unsupported bulk action")
+    if action.action == "move":
+        if action.tab_id is None:
+            raise HTTPException(status_code=400, detail="tab_id is required for move")
+        tab = db.query(Tab).filter(Tab.id == action.tab_id, Tab.user_id == user.id).first()
+        if not tab:
+            raise HTTPException(status_code=404, detail="Tab not found")
     links = db.query(Link).filter(Link.id.in_(action.link_ids), Link.user_id == user.id).all()
     count = 0
     for link in links:
         if action.action == "delete":
             db.delete(link)
-        elif action.action == "move" and action.tab_id is not None:
+        elif action.action == "move":
             link.tab_id = action.tab_id
         elif action.action == "pin":
             link.is_pinned = True
@@ -152,14 +167,21 @@ def bulk_action(action: BulkLinkAction, user: User = Depends(_get_current_user),
 
 @router.post("/reorder")
 def reorder_links(items: List[ReorderItem], user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    requested_tab_ids = {item.tab_id for item in items if item.tab_id is not None}
+    if requested_tab_ids:
+        owned_tab_ids = {
+            tab.id
+            for tab in db.query(Tab.id).filter(Tab.id.in_(requested_tab_ids), Tab.user_id == user.id).all()
+        }
+        missing = requested_tab_ids - owned_tab_ids
+        if missing:
+            raise HTTPException(status_code=404, detail="Tab not found")
     for item in items:
         link = db.query(Link).filter(Link.id == item.id, Link.user_id == user.id).first()
         if link:
             link.sort_order = item.sort_order
             if item.tab_id is not None:
-                tab = db.query(Tab).filter(Tab.id == item.tab_id, Tab.user_id == user.id).first()
-                if tab:
-                    link.tab_id = item.tab_id
+                link.tab_id = item.tab_id
     db.commit()
     return {"status": "ok"}
 
@@ -196,15 +218,18 @@ def check_link_health(
     redirects = 0
     checked = 0
 
-    with httpx.Client(timeout=15, follow_redirects=True, verify=False) as client:
+    with httpx.Client(timeout=15, follow_redirects=True, trust_env=False) as client:
         for link in links:
             try:
+                validate_public_http_url(link.url)
                 resp = client.head(link.url)
                 status = resp.status_code
+            except ValueError:
+                status = 0
             except httpx.HTTPError:
                 status = 0
 
-            link.http_status = status if status else None
+            link.http_status = status
             link.last_checked = datetime.now(timezone.utc)
             checked += 1
 
@@ -212,7 +237,7 @@ def check_link_health(
                 alive += 1
                 if status >= 300:
                     redirects += 1
-            elif status and status >= 400:
+            elif status == 0 or status >= 400:
                 dead += 1
 
             time.sleep(1)
@@ -228,7 +253,7 @@ def get_dead_links(
 ):
     return (
         db.query(Link)
-        .filter(Link.user_id == user.id, Link.http_status >= 400)
+        .filter(Link.user_id == user.id, (Link.http_status >= 400) | (Link.http_status == 0))
         .order_by(Link.http_status.desc())
         .all()
     )
@@ -247,10 +272,13 @@ def fetch_link_content(
         raise HTTPException(status_code=404, detail="Link not found")
 
     try:
-        with httpx.Client(timeout=15, follow_redirects=True, verify=False) as client:
+        validate_public_http_url(link.url)
+        with httpx.Client(timeout=15, follow_redirects=True, trust_env=False) as client:
             resp = client.get(link.url)
             resp.raise_for_status()
         html_text = resp.text[:500_000]
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"Failed to fetch URL: {e}")
 

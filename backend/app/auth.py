@@ -18,6 +18,8 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_access_token(*, data: dict) -> str:
     to_encode = data.copy()
+    if "sub" in to_encode:
+        to_encode["sub"] = str(to_encode["sub"])
     expire = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRE_MINUTES)
     to_encode["exp"] = expire
     return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)

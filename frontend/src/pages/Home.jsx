@@ -64,7 +64,15 @@ export default function Home({ token }) {
     setPasting(true)
     toast.success('Saving...')
     try {
-      await createLink({ url })
+      let meta = {}
+      try { meta = await api.fetchMetadata(url) } catch {}
+      await createLink({
+        title: meta.title || url,
+        url,
+        description: meta.description || null,
+        favicon: meta.favicon || null,
+        image: meta.image || null,
+      })
       toast.success('Link saved')
       refreshLinks()
     } catch (err) {

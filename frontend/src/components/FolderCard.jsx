@@ -64,8 +64,11 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchEnd}
     >
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={handleClick}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() } }}
         className="w-full text-left glass rounded-2xl p-4 transition-all relative overflow-hidden hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]"
       >
         {/* Color accent bar at bottom */}
@@ -130,19 +133,16 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
             )}
           </div>
         )}
-      </button>
+      </div>
 
       {/* Context menu */}
       {showMenu && (
-        <div
-          className="fixed inset-0 z-[70]"
-          onClick={() => setShowMenu(false)}
-        >
+        <>
+          <div className="fixed inset-0 z-[70]" onClick={() => setShowMenu(false)} />
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            className="absolute right-0 top-full mt-1 z-[75] glass rounded-xl py-1 min-w-[140px] shadow-xl"
-            style={{ right: '8px' }}
+            className="absolute right-2 top-10 z-[75] glass rounded-xl py-1 min-w-[140px] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -159,7 +159,7 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
               <Trash size={13} /> Delete
             </button>
           </motion.div>
-        </div>
+        </>
       )}
     </motion.div>
   )

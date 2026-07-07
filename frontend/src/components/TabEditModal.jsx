@@ -39,8 +39,25 @@ export default function TabEditModal({ tab, onClose, onSave, onDelete, allTabs }
     onSave({ name: name.trim(), color, icon, parent_id: parentId })
   }
 
-  // Other tabs that can be a parent (exclude self and children to prevent circular refs)
-  const availableParents = (allTabs || []).filter(t => t.id !== tab.id)
+  const childMap = (allTabs || []).reduce((acc, item) => {
+    if (item.parent_id) {
+      if (!acc[item.parent_id]) acc[item.parent_id] = []
+      acc[item.parent_id].push(item.id)
+    }
+    return acc
+  }, {})
+  const descendants = new Set()
+  const pending = [...(childMap[tab.id] || [])]
+  while (pending.length) {
+    const id = pending.pop()
+    if (!descendants.has(id)) {
+      descendants.add(id)
+      pending.push(...(childMap[id] || []))
+    }
+  }
+
+  // Other tabs that can be a parent (exclude self and descendants to prevent circular refs)
+  const availableParents = (allTabs || []).filter(t => t.id !== tab.id && !descendants.has(t.id))
   const currentParent = availableParents.find(t => t.id === parentId)
 
   const handleDelete = async () => {

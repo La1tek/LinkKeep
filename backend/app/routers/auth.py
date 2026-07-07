@@ -6,7 +6,6 @@ from app.database import get_db
 from app.models import User
 from app.schemas import UserCreate, UserOut, Token
 from app.auth import get_password_hash, verify_password, create_access_token, decode_token
-from app.config import JWT_SECRET, JWT_ALGORITHM
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -21,12 +20,17 @@ def _get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends
     )
     try:
         payload = decode_token(token)
-        username: str = payload.get("sub")
-        if username is None:
+        subject = payload.get("sub")
+        if subject is None:
             raise cred_exc
     except Exception:
         raise cred_exc
-    user = db.query(User).filter(User.username == username).first()
+    user = None
+    try:
+        user = db.query(User).filter(User.id == int(subject)).first()
+    except (TypeError, ValueError):
+        # Backwards compatibility for tokens issued before v2.4.
+        user = db.query(User).filter(User.username == subject).first()
     if user is None:
         raise cred_exc
     return user
@@ -49,7 +53,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
-    token = create_access_token(data={"sub": user.username})
+    token = create_access_token(data={"sub": user.id})
     return Token(access_token=token)
 
 

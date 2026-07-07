@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
@@ -15,5 +15,8 @@ class URLRequest(BaseModel):
 
 @router.post("")
 async def get_metadata(req: URLRequest, user: User = Depends(_get_current_user)):
-    meta = await fetch_metadata(req.url)
+    try:
+        meta = await fetch_metadata(req.url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return meta

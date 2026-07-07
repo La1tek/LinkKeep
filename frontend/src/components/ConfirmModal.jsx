@@ -56,7 +56,7 @@ export function ConfirmModal() {
     }
   }
 
-  const buttons = options.buttons || (options.threeWay ? layouts.threeWay.buttons : layouts.danger.buttons)
+  const buttons = options.buttons || (options.threeWay ? layouts.threeWay.buttons : options.danger ? layouts.danger.buttons : layouts.default.buttons)
 
   return (
     <AnimatePresence>

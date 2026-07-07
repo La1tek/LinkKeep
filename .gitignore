@@ -1,7 +1,9 @@
 node_modules
 dist
+.venv*/
+.pytest_cache
 __pycache__
 *.pyc
 data/
 .env
-extension/icons/
+.DS_Store

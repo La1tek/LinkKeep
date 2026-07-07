@@ -40,4 +40,9 @@ export const useAuth = create((set, get) => ({
     localStorage.removeItem(USER_KEY)
     set({ token: null, user: null })
   },
+
+  setUser: (user) => {
+    localStorage.setItem(USER_KEY, JSON.stringify(user))
+    set({ user })
+  },
 }))
