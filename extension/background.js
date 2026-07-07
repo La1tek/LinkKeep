@@ -3,6 +3,8 @@
 const SYNC_FOLDER = 'LinkKeep';
 const SYNC_ALARM_NAME = 'linkkeep-sync';
 const SYNC_INTERVAL_MINUTES = 1;
+const DEFAULT_SYNC_POLICY = 'browser_wins';
+const MAX_SYNC_LOGS = 50;
 let suppressBookmarkEvents = false;
 
 // --- Storage helpers ---
@@ -14,12 +16,31 @@ function getAuth() {
 
 function getSyncSettings() {
   return new Promise(resolve => {
-    chrome.storage.local.get(['lk_sync_enabled', 'lk_sync_folder_id', 'lk_last_sync'], resolve);
+    chrome.storage.local.get(['lk_sync_enabled', 'lk_sync_folder_id', 'lk_last_sync', 'lk_sync_policy', 'lk_sync_logs'], settings => {
+      resolve({
+        ...settings,
+        lk_sync_policy: settings.lk_sync_policy || DEFAULT_SYNC_POLICY,
+        lk_sync_logs: settings.lk_sync_logs || [],
+      });
+    });
   });
 }
 
 function setSyncData(key, value) {
   return new Promise(resolve => chrome.storage.local.set({ [key]: value }, resolve));
+}
+
+async function addSyncLog(level, message, details = {}) {
+  const { lk_sync_logs } = await getSyncSettings();
+  const entry = {
+    ts: new Date().toISOString(),
+    level,
+    message,
+    details,
+  };
+  const logs = [entry, ...(lk_sync_logs || [])].slice(0, MAX_SYNC_LOGS);
+  await setSyncData('lk_sync_logs', logs);
+  return entry;
 }
 
 // --- API helper ---
@@ -98,7 +119,8 @@ function normalizeUrl(url) {
 
 // --- SYNC: LinkKeep → Browser Bookmarks ---
 // Pull all links from LinkKeep and create bookmarks for missing ones
-async function syncFromLinkKeepToBookmarks(folderId) {
+async function syncFromLinkKeepToBookmarks(folderId, options = {}) {
+  const dryRun = !!options.dryRun;
   let allLinks = [];
   let offset = 0;
   const limit = 100;
@@ -125,23 +147,25 @@ async function syncFromLinkKeepToBookmarks(folderId) {
   let updated = 0;
   let removed = 0;
 
-  suppressBookmarkEvents = true;
+  suppressBookmarkEvents = !dryRun;
   try {
     for (const link of allLinks) {
       const normUrl = normalizeUrl(link.url);
       const existing = bookmarkMap.get(normUrl);
 
       if (!existing) {
-        // Create bookmark
-        await chrome.bookmarks.create({
-          parentId: folderId,
-          title: link.title,
-          url: link.url,
-        });
+        if (!dryRun) {
+          await chrome.bookmarks.create({
+            parentId: folderId,
+            title: link.title,
+            url: link.url,
+          });
+        }
         created++;
       } else if (existing.title !== link.title) {
-        // Update title if changed
-        await chrome.bookmarks.update(existing.id, { title: link.title });
+        if (!dryRun) {
+          await chrome.bookmarks.update(existing.id, { title: link.title });
+        }
         updated++;
       }
     }
@@ -150,7 +174,9 @@ async function syncFromLinkKeepToBookmarks(folderId) {
     const linkkeepUrls = new Set(allLinks.map(l => normalizeUrl(l.url)));
     for (const bm of existingBookmarks) {
       if (bm.url && !linkkeepUrls.has(normalizeUrl(bm.url))) {
-        await chrome.bookmarks.remove(bm.id);
+        if (!dryRun) {
+          await chrome.bookmarks.remove(bm.id);
+        }
         removed++;
       }
     }
@@ -158,9 +184,11 @@ async function syncFromLinkKeepToBookmarks(folderId) {
     suppressBookmarkEvents = false;
   }
 
-  await setSyncData('lk_last_sync', new Date().toISOString());
+  if (!dryRun) {
+    await setSyncData('lk_last_sync', new Date().toISOString());
+  }
 
-  return { created, updated, removed, total: allLinks.length };
+  return { created, updated, removed, total: allLinks.length, dryRun };
 }
 
 // --- SYNC: Browser Bookmarks → LinkKeep ---
@@ -168,7 +196,7 @@ async function syncFromLinkKeepToBookmarks(folderId) {
 async function syncBookmarkToLinkKeep(bookmark, tabName = null) {
   if (!bookmark.url) return; // Skip folders
 
-  const { lk_sync_folder_id } = await getSyncSettings();
+  const { lk_sync_folder_id, lk_sync_policy } = await getSyncSettings();
   // Only sync bookmarks inside our folder
   if (bookmark.parentId !== lk_sync_folder_id) return;
 
@@ -178,9 +206,19 @@ async function syncBookmarkToLinkKeep(bookmark, tabName = null) {
   const match = existing.find(l => normalizeUrl(l.url) === normUrl);
 
   if (match) {
-    // Update title if changed
     if (match.title !== bookmark.title) {
-      await apiFetch(`/links/${match.id}`, 'PUT', { title: bookmark.title });
+      if (lk_sync_policy === 'linkkeep_wins') {
+        suppressBookmarkEvents = true;
+        try {
+          await chrome.bookmarks.update(bookmark.id, { title: match.title });
+        } finally {
+          suppressBookmarkEvents = false;
+        }
+        await addSyncLog('info', 'Resolved title conflict from LinkKeep', { url: bookmark.url });
+      } else {
+        await apiFetch(`/links/${match.id}`, 'PUT', { title: bookmark.title });
+        await addSyncLog('info', 'Resolved title conflict from browser', { url: bookmark.url });
+      }
     }
   } else {
     // Create new link
@@ -226,6 +264,7 @@ chrome.bookmarks.onCreated.addListener(async (id, bookmark) => {
     }
   } catch (e) {
     console.error('[LinkKeep Sync] onCreated error:', e);
+    await addSyncLog('error', 'Bookmark create sync failed', { detail: e.message });
   }
 });
 
@@ -240,6 +279,7 @@ chrome.bookmarks.onChanged.addListener(async (id, changeInfo) => {
     }
   } catch (e) {
     console.error('[LinkKeep Sync] onChanged error:', e);
+    await addSyncLog('error', 'Bookmark change sync failed', { detail: e.message });
   }
 });
 
@@ -255,19 +295,24 @@ chrome.bookmarks.onRemoved.addListener(async (id, removeInfo) => {
     }
   } catch (e) {
     console.error('[LinkKeep Sync] onRemoved error:', e);
+    await addSyncLog('error', 'Bookmark remove sync failed', { detail: e.message });
   }
 });
 
-async function runPeriodicSync() {
+async function runPeriodicSync(options = {}) {
   const { lk_sync_enabled } = await getSyncSettings();
-  if (!lk_sync_enabled) return;
+  if (!lk_sync_enabled && !options.dryRun) return;
 
   try {
     const folderId = await getOrCreateSyncFolder();
-    const result = await syncFromLinkKeepToBookmarks(folderId);
+    const result = await syncFromLinkKeepToBookmarks(folderId, options);
     console.log('[LinkKeep Sync] Periodic sync:', result);
+    await addSyncLog('info', result.dryRun ? 'Dry-run sync complete' : 'Sync complete', result);
+    return result;
   } catch (e) {
     console.error('[LinkKeep Sync] Periodic sync error:', e);
+    await addSyncLog('error', 'Sync failed', { detail: e.message });
+    throw e;
   }
 }
 
@@ -281,14 +326,14 @@ function stopSyncTimer() {
 }
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === SYNC_ALARM_NAME) runPeriodicSync();
+  if (alarm.name === SYNC_ALARM_NAME) runPeriodicSync().catch(() => {});
 });
 
 // Start/stop sync based on settings
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.lk_sync_enabled) {
     if (changes.lk_sync_enabled.newValue) {
-      runPeriodicSync();
+      runPeriodicSync().catch(() => {});
       startSyncTimer();
     } else {
       stopSyncTimer();
@@ -335,9 +380,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     (async () => {
       try {
         const folderId = await getOrCreateSyncFolder();
-        const result = await syncFromLinkKeepToBookmarks(folderId);
+        const result = await syncFromLinkKeepToBookmarks(folderId, { dryRun: !!msg.dryRun });
+        await addSyncLog('info', result.dryRun ? 'Manual dry-run sync complete' : 'Manual sync complete', result);
         sendResponse({ ok: true, data: result });
       } catch (e) {
+        await addSyncLog('error', 'Manual sync failed', { detail: e.message });
         sendResponse({ ok: false, data: { detail: e.message } });
       }
     })();
