@@ -38,6 +38,17 @@ export const api = {
     form.append('password', password)
     return request('/auth/login', { method: 'POST', body: form })
   },
+
+  // Full-text search
+  fulltextSearch: (params = {}) => {
+    const q = new URLSearchParams()
+    if (params.q) q.set('q', params.q)
+    if (params.tag) q.set('tag', params.tag)
+    if (params.favorite != null) q.set('favorite', params.favorite)
+    if (params.dead != null) q.set('dead', params.dead)
+    return request(`/search/fulltext?${q.toString()}`)
+  },
+  reindexSearch: () => request('/search/reindex', { method: 'POST' }),
   me: () => request('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),
   listSessions: () => request('/auth/sessions'),
@@ -87,6 +98,34 @@ export const api = {
   restoreData: (data, mode = 'replace') => request(`/settings/restore?mode=${encodeURIComponent(mode)}`, { method: 'POST', body: data }),
   deleteAccount: () => request('/settings/account', { method: 'DELETE' }),
   createBotToken: () => request('/settings/bot-token', { method: 'POST' }),
+  importFile: (file, source, mode = 'merge') => {
+    const form = new FormData()
+    form.append('file', file)
+    return request(`/settings/import-file?source=${encodeURIComponent(source)}&mode=${encodeURIComponent(mode)}`, { method: 'POST', body: form })
+  },
+  listSnapshots: () => request('/settings/snapshots'),
+  createSnapshot: (name = null) => request('/settings/snapshots', { method: 'POST', body: { name } }),
+  restoreSnapshot: (id, mode = 'replace') => request(`/settings/snapshots/${id}/restore?mode=${encodeURIComponent(mode)}`, { method: 'POST' }),
+  deleteSnapshot: (id) => request(`/settings/snapshots/${id}`, { method: 'DELETE' }),
+
+  // Jobs
+  listJobs: () => request('/jobs'),
+  createJob: (type, payload = {}, runNow = false) => request('/jobs', { method: 'POST', body: { type, payload, run_now: runNow } }),
+
+  // Shares
+  listShares: () => request('/shares'),
+  createShare: (data) => request('/shares', { method: 'POST', body: data }),
+  deleteShare: (id) => request(`/shares/${id}`, { method: 'DELETE' }),
+  getPublicShare: (token) => request(`/public/shares/${token}`),
+
+  // Recommendations
+  getRecommendations: () => request('/recommendations'),
+  applyRecommendedTags: () => request('/recommendations/apply-tags', { method: 'POST' }),
+
+  // Admin
+  adminOverview: () => request('/admin/overview'),
+  adminUsers: () => request('/admin/users'),
+  adminJobs: () => request('/admin/jobs'),
 
   // Tags
   listTags: () => request('/tags'),

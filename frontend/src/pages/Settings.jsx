@@ -7,10 +7,12 @@ import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
 import { useToast } from '../components/Toast'
 import { openConfirm } from '../components/ConfirmModal'
+import { useI18n } from '../lib/i18n'
 
 export default function Settings({ user }) {
   const navigate = useNavigate()
   const { theme, toggle } = useTheme()
+  const { lang, setLanguage, t } = useI18n()
   const { logout, setUser } = useAuth()
   const toast = useToast()
   const [editing, setEditing] = useState(null)
@@ -21,6 +23,10 @@ export default function Settings({ user }) {
   const [botCommand, setBotCommand] = useState('')
   const [sessions, setSessions] = useState([])
   const [importMode, setImportMode] = useState('merge')
+  const [importSource, setImportSource] = useState('generic_json')
+  const [snapshots, setSnapshots] = useState([])
+  const [jobs, setJobs] = useState([])
+  const [adminAvailable, setAdminAvailable] = useState(false)
   const [tags, setTags] = useState([])
   const [tagDrafts, setTagDrafts] = useState({})
 
@@ -32,6 +38,9 @@ export default function Settings({ user }) {
     }).catch(() => {})
     api.listSessions().then(setSessions).catch(() => {})
     api.listTags().then((data) => setTags(data.tags || [])).catch(() => {})
+    api.listSnapshots().then((data) => setSnapshots(data.snapshots || [])).catch(() => {})
+    api.listJobs().then((data) => setJobs(data.jobs || [])).catch(() => {})
+    api.adminOverview().then(() => setAdminAvailable(true)).catch(() => setAdminAvailable(false))
   }, [])
 
   const handleChangeUsername = async (e) => {
@@ -73,16 +82,20 @@ export default function Settings({ user }) {
 
   const handleImport = (e) => {
     const file = e.target.files[0]; if (!file) return
-    const reader = new FileReader()
-    reader.onload = async (ev) => {
+    ;(async () => {
       try {
-        const data = JSON.parse(ev.target.result)
-        const result = await api.importData(data, importMode)
+        let result
+        if (importSource === 'generic_json') {
+          const text = await file.text()
+          result = await api.importData(JSON.parse(text), importMode)
+        } else {
+          result = await api.importFile(file, importSource, importMode)
+        }
         toast.success(`Imported ${result.tabs} tabs, ${result.links} links · merged ${result.merged || 0}, skipped ${result.skipped || 0}`)
         setTimeout(() => window.location.reload(), 1500)
       } catch (err) { toast.error('Import failed: ' + err.message) }
-    }
-    reader.readAsText(file); e.target.value = ''
+      e.target.value = ''
+    })()
   }
 
   const handleDeleteAccount = async () => {
@@ -139,10 +152,44 @@ export default function Settings({ user }) {
     }
   }
 
+  const handleCreateSnapshot = async () => {
+    try {
+      const snapshot = await api.createSnapshot()
+      setSnapshots((items) => [snapshot, ...items])
+      toast.success('Snapshot created')
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const handleRestoreSnapshot = async (snapshot) => {
+    const ok = await openConfirm({ title: 'Restore snapshot?', message: `Restore "${snapshot.name}" using ${importMode} mode?` })
+    if (!ok) return
+    try {
+      await api.restoreSnapshot(snapshot.id, importMode)
+      toast.success('Snapshot restored')
+      setTimeout(() => window.location.reload(), 1000)
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const handleDeleteSnapshot = async (snapshot) => {
+    try {
+      await api.deleteSnapshot(snapshot.id)
+      setSnapshots((items) => items.filter((item) => item.id !== snapshot.id))
+      toast.success('Snapshot deleted')
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const handleRunJob = async (type) => {
+    try {
+      const job = await api.createJob(type, {}, true)
+      setJobs((items) => [job, ...items])
+      toast.success(`${type} ${job.status}`)
+    } catch (err) { toast.error(err.message) }
+  }
+
   return (
     <div className="flex-1 min-h-[100dvh]">
       <header className="sticky top-0 z-30 glass px-4 sm:px-8 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-        <h1 className="text-base font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>Settings</h1>
+        <h1 className="text-base font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>{t('settings')}</h1>
       </header>
 
       <main className="px-4 sm:px-8 py-6 max-w-2xl space-y-8 pb-24 sm:pb-8">
@@ -211,12 +258,22 @@ export default function Settings({ user }) {
               <div className="flex items-center gap-3">{theme === 'dark' ? <Moon size={18} style={{ color: 'var(--text-tertiary)' }} /> : <Sun size={18} style={{ color: 'var(--text-tertiary)' }} />}<span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Theme</span></div>
               <span className="text-xs capitalize" style={{ color: 'var(--text-muted)' }}>{theme}</span>
             </button>
+            <div className="px-4 py-3.5 flex items-center justify-between gap-3">
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('language')}</span>
+              <select value={lang} onChange={(e) => setLanguage(e.target.value)} className="input-base rounded-lg px-2 py-1 text-xs outline-none" aria-label="Language">
+                <option value="en">English</option>
+                <option value="ru">Русский</option>
+              </select>
+            </div>
           </div>
         </Section>
 
         <Section title="Data Management">
           <div className="glass rounded-2xl divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
             <button onClick={() => navigate('/duplicates')} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><SidebarSimple size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Find Duplicates</span></div><span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>scan for dupes</span></button>
+            <button onClick={() => navigate('/shares')} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><House size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('publicShares')}</span></div><span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>public links</span></button>
+            <button onClick={() => navigate('/recommendations')} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><Tag size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('recommendations')}</span></div><span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>autotags</span></button>
+            {adminAvailable && <button onClick={() => navigate('/admin')} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><Key size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('admin')}</span></div><span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>ops</span></button>}
             <button onClick={handleExport} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><Download size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Export as JSON</span></div><span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>.json</span></button>
             <button onClick={handleExportHtml} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><Download size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Export as HTML Bookmarks</span></div><span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>.html</span></button>
             <div className="px-4 py-3.5 flex items-center justify-between gap-3">
@@ -227,7 +284,34 @@ export default function Settings({ user }) {
                 <option value="replace">Replace all</option>
               </select>
             </div>
-            <label className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors cursor-pointer"><div className="flex items-center gap-3"><Upload size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Import JSON</span></div><span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>click to select</span><input type="file" accept=".json" onChange={handleImport} className="hidden" /></label>
+            <div className="px-4 py-3.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3"><Upload size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Import Source</span></div>
+              <select value={importSource} onChange={(e) => setImportSource(e.target.value)} className="input-base rounded-lg px-2 py-1 text-xs outline-none">
+                <option value="generic_json">LinkKeep JSON</option>
+                <option value="bookmarks_html">Browser bookmarks HTML</option>
+                <option value="pocket_json">Pocket JSON</option>
+                <option value="raindrop_csv">Raindrop CSV</option>
+              </select>
+            </div>
+            <label className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors cursor-pointer"><div className="flex items-center gap-3"><Upload size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Import File</span></div><span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>click to select</span><input type="file" accept=".json,.html,.htm,.csv" onChange={handleImport} className="hidden" /></label>
+          </div>
+        </Section>
+
+        <Section title="Snapshots & Jobs">
+          <div className="glass rounded-2xl divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+            <button onClick={handleCreateSnapshot} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><Download size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Create Snapshot</span></div><span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{snapshots.length} saved</span></button>
+            <button onClick={() => handleRunJob('rebuild_search_index')} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><SidebarSimple size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Rebuild Search Index</span></div><span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>job</span></button>
+            <button onClick={() => handleRunJob('backup_snapshot')} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><Download size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Run Backup Job</span></div><span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{jobs[0]?.status || 'ready'}</span></button>
+            {snapshots.slice(0, 5).map((snapshot) => (
+              <div key={snapshot.id} className="px-4 py-3 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>{snapshot.name}</p>
+                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{new Date(snapshot.created_at).toLocaleString()}</p>
+                </div>
+                <button onClick={() => handleRestoreSnapshot(snapshot)} className="text-xs text-accent-400 px-2 py-1 rounded-lg hover:bg-accent-500/10">Restore</button>
+                <button onClick={() => handleDeleteSnapshot(snapshot)} className="text-xs text-red-400 px-2 py-1 rounded-lg hover:bg-red-500/10">Delete</button>
+              </div>
+            ))}
           </div>
         </Section>
 

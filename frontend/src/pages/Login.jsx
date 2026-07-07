@@ -35,13 +35,13 @@ export default function Login() {
         <div className="glass rounded-2xl p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>Username</label>
-              <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)}
+              <label htmlFor="login-username" className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>Username</label>
+              <input id="login-username" type="text" required value={username} onChange={(e) => setUsername(e.target.value)}
                 placeholder="your_username" className="input-base w-full rounded-xl px-4 py-3 text-sm outline-none" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>Password</label>
-              <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
+              <label htmlFor="login-password" className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>Password</label>
+              <input id="login-password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••" className="input-base w-full rounded-xl px-4 py-3 text-sm outline-none" />
             </div>
             {error && <p className="text-xs text-red-400 bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
