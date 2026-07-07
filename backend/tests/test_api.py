@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import config as app_config
+from app import middleware as app_middleware
 from app.database import Base, get_db
 from app.main import app
 
@@ -36,6 +37,12 @@ def db_session():
     yield TestingSession()
     Base.metadata.drop_all(bind=engine)
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def disable_rate_limit(monkeypatch):
+    monkeypatch.setattr(app_config, "RATE_LIMIT_ENABLED", False)
+    monkeypatch.setattr(app_middleware, "RATE_LIMIT_ENABLED", False)
 
 
 @pytest.fixture
@@ -506,6 +513,32 @@ class TestSettings:
         tags = client.get("/api/tags", headers=auth_user).json()["tags"]
         assert all(tag["name"] != "reference" for tag in tags)
 
+    def test_snapshots_restore_data(self, client, auth_user):
+        link = client.post("/api/links", json={"title": "Saved", "url": "https://saved.com"}, headers=auth_user).json()
+        snapshot = client.post("/api/settings/snapshots", json={"name": "Before delete"}, headers=auth_user)
+        assert snapshot.status_code == 201
+
+        client.delete(f"/api/links/{link['id']}", headers=auth_user)
+        assert client.get("/api/links", headers=auth_user).json() == []
+
+        restore = client.post(f"/api/settings/snapshots/{snapshot.json()['id']}/restore?mode=replace", headers=auth_user)
+        assert restore.status_code == 200
+        links = client.get("/api/links", headers=auth_user).json()
+        assert len(links) == 1
+        assert links[0]["title"] == "Saved"
+
+    def test_import_file_bookmarks_html(self, client, auth_user):
+        html = '<!DOCTYPE NETSCAPE-Bookmark-file-1><a href="https://docs.example.com">Docs</a>'
+        resp = client.post(
+            "/api/settings/import-file?source=bookmarks_html&mode=merge",
+            files={"file": ("bookmarks.html", html, "text/html")},
+            headers=auth_user,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["links"] == 1
+        links = client.get("/api/links", headers=auth_user).json()
+        assert links[0]["url"] == "https://docs.example.com"
+
 
 class TestDuplicateMerge:
     def test_merge_duplicates_preserves_source_data(self, client, auth_user):
@@ -546,6 +579,54 @@ class TestDuplicateMerge:
         assert merged["is_favorite"] is True
         assert merged["is_pinned"] is True
         assert merged["description"] == "source description"
+
+
+class TestProductFeatures:
+    def test_jobs_run_now_backup_snapshot(self, client, auth_user):
+        client.post("/api/links", json={"title": "Job", "url": "https://job.com"}, headers=auth_user)
+        resp = client.post("/api/jobs", json={"type": "backup_snapshot", "payload": {"name": "Job snapshot"}, "run_now": True}, headers=auth_user)
+        assert resp.status_code == 201
+        assert resp.json()["status"] == "succeeded"
+        snapshots = client.get("/api/settings/snapshots", headers=auth_user).json()["snapshots"]
+        assert len(snapshots) == 1
+
+    def test_fulltext_search(self, client, auth_user):
+        client.post(
+            "/api/links",
+            json={"title": "FastAPI Guide", "url": "https://fastapi.tiangolo.com", "note": "python backend docs"},
+            headers=auth_user,
+        )
+        reindex = client.post("/api/search/reindex", headers=auth_user)
+        assert reindex.status_code == 200
+        resp = client.get("/api/search/fulltext?q=python docs", headers=auth_user)
+        assert resp.status_code == 200
+        assert resp.json()["count"] == 1
+
+    def test_public_share(self, client, auth_user):
+        client.post("/api/links", json={"title": "Shared", "url": "https://shared.com"}, headers=auth_user)
+        share = client.post("/api/shares", json={"title": "Public collection"}, headers=auth_user)
+        assert share.status_code == 201
+        token = share.json()["token"]
+        public = client.get(f"/api/public/shares/{token}")
+        assert public.status_code == 200
+        assert public.json()["title"] == "Public collection"
+        assert public.json()["links"][0]["title"] == "Shared"
+
+    def test_recommendations_and_apply_tags(self, client, auth_user):
+        client.post("/api/links", json={"title": "GitHub Repo", "url": "https://github.com/org/repo"}, headers=auth_user)
+        resp = client.get("/api/recommendations", headers=auth_user)
+        assert resp.status_code == 200
+        assert resp.json()["autotags"][0]["suggested_tags"] == ["code"]
+        apply = client.post("/api/recommendations/apply-tags", headers=auth_user)
+        assert apply.status_code == 200
+        links = client.get("/api/links", headers=auth_user).json()
+        assert links[0]["tags"] == ["code"]
+
+    def test_admin_overview(self, client, auth_user, monkeypatch):
+        monkeypatch.setattr(app_config, "ADMIN_USERNAMES", {"testuser"})
+        resp = client.get("/api/admin/overview", headers=auth_user)
+        assert resp.status_code == 200
+        assert resp.json()["users"] == 1
 
 
 class TestMetadataSecurity:
