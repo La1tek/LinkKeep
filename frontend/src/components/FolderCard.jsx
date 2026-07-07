@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { DotsThree, PencilSimple, Trash, CaretRight } from '@phosphor-icons/react'
+import { DotsThree, PencilSimple, Trash, CaretRight, LockKey, LockKeyOpen } from '@phosphor-icons/react'
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AnimatedCounter from './AnimatedCounter'
@@ -19,16 +19,17 @@ function getFaviconUrl(url) {
   catch { return null }
 }
 
-export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelete }) {
+export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelete, onUnlock, onProtect }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const longPressTimer = useRef(null)
   const navigate = useNavigate()
 
-  const linkCount = tab.total_link_count ?? tab.link_count ?? links.length
+  const locked = tab.is_locked && !tab.is_unlocked
+  const linkCount = locked ? 0 : (tab.total_link_count ?? tab.link_count ?? links.length)
 
   // Get last 4 favicons from links
-  const previewFavicons = (links || []).slice(0, 4).map(l => ({
+  const previewFavicons = locked ? [] : (links || []).slice(0, 4).map(l => ({
     favicon: l.favicon || getFaviconUrl(l.url),
     domain: getDomain(l.url),
   })).filter(f => f.domain)
@@ -45,6 +46,10 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
 
   const handleClick = () => {
     if (showMenu) return
+    if (locked) {
+      onUnlock?.(tab)
+      return
+    }
     navigate(`/folder/${tab.id}`)
   }
 
@@ -86,14 +91,14 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
               className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: `${accentColor}20`, border: `1px solid ${accentColor}30` }}
             >
-              <div className="h-3 w-3 rounded-full" style={{ backgroundColor: accentColor }} />
+              {locked ? <LockKey size={16} weight="fill" style={{ color: accentColor }} /> : <div className="h-3 w-3 rounded-full" style={{ backgroundColor: accentColor }} />}
             </div>
             <div className="min-w-0">
               <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                 {tab.name}
               </h3>
               <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                <AnimatedCounter value={linkCount} /> {linkCount === 1 ? 'link' : 'links'}
+                {locked ? 'Protected' : <><AnimatedCounter value={linkCount} /> {linkCount === 1 ? 'link' : 'links'}</>}
               </p>
             </div>
           </div>
@@ -108,7 +113,14 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
         </div>
 
         {/* Subfolder indicator */}
-        {(tab.child_count > 0) && (
+        {locked && (
+          <div className="flex items-center gap-1 mt-2">
+            <LockKey size={10} weight="fill" style={{ color: accentColor }} />
+            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Password required</span>
+          </div>
+        )}
+
+        {!locked && (tab.child_count > 0) && (
           <div className="flex items-center gap-1 mt-2">
             <CaretRight size={10} weight="bold" style={{ color: accentColor }} />
             <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{tab.child_count} subfolder{tab.child_count === 1 ? '' : 's'}</span>
@@ -116,7 +128,7 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
         )}
 
         {/* Preview favicons */}
-        {previewFavicons.length > 0 && (
+        {!locked && previewFavicons.length > 0 && (
           <div className="flex items-center gap-1 mt-2 flex-wrap">
             {previewFavicons.map((f, i) => (
               <img
@@ -152,6 +164,34 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
             >
               <PencilSimple size={13} /> Edit
             </button>
+            {tab.is_locked ? (
+              <>
+                {!tab.is_unlocked && (
+                  <button
+                    onClick={() => { onUnlock?.(tab); setShowMenu(false) }}
+                    className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    <LockKeyOpen size={13} /> Unlock
+                  </button>
+                )}
+                <button
+                  onClick={() => { onProtect?.(tab, 'remove'); setShowMenu(false) }}
+                  className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  <LockKeyOpen size={13} /> Remove protection
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => { onProtect?.(tab, 'lock'); setShowMenu(false) }}
+                className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <LockKey size={13} /> Set password
+              </button>
+            )}
             <button
               onClick={() => { onDelete?.(tab); setShowMenu(false) }}
               className="w-full px-3 py-2 text-left text-xs hover:bg-red-500/10 flex items-center gap-2 text-red-400"

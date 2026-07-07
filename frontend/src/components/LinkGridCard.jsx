@@ -1,4 +1,4 @@
-import { Star, DotsThreeVertical, Trash, PencilSimple, PushPin, PushPinSlash, NotePencil, Check, ArrowUpRight, GlobeHemisphereWest } from '@phosphor-icons/react'
+import { Star, DotsThreeVertical, Trash, PencilSimple, PushPin, PushPinSlash, NotePencil, Check, ArrowUpRight, GlobeHemisphereWest, Archive, BookOpen } from '@phosphor-icons/react'
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -6,7 +6,20 @@ function getDomain(url) {
   try { return new URL(url).hostname.replace('www.', '') } catch { return url }
 }
 
-export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTogglePin, onSelect, selected, selectionMode }) {
+function ArchiveStatusBadge({ link }) {
+  if (!link.archive_status) return null
+  const done = link.archive_status === 'completed'
+  const failed = link.archive_status === 'failed'
+  const color = done ? '#22c55e' : failed ? '#ef4444' : '#f59e0b'
+  const label = done ? 'Archived' : failed ? 'Archive failed' : 'Archiving'
+  return (
+    <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full mt-2" style={{ color, background: `${color}14`, border: `1px solid ${color}26` }}>
+      <Archive size={9} weight="fill" /> {label}
+    </span>
+  )
+}
+
+export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTogglePin, onArchive, onViewArchive, onSelect, selected, selectionMode }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [showNote, setShowNote] = useState(false)
   const longPressTimer = useRef(null)
@@ -106,6 +119,7 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
               {getDomain(link.url)}
               <ArrowUpRight size={10} weight="bold" className="shrink-0 opacity-50" />
             </p>
+            <ArchiveStatusBadge link={link} />
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen) }}
@@ -160,6 +174,16 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
               className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
             >
               <GlobeHemisphereWest size={13} /> Wayback Machine
+            </button>
+            <button onClick={() => { onArchive?.(link); setMenuOpen(false) }}
+              className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
+            >
+              <Archive size={13} /> Archive now
+            </button>
+            <button onClick={() => { onViewArchive?.(link); setMenuOpen(false) }}
+              className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
+            >
+              <BookOpen size={13} /> View archive
             </button>
             <button onClick={() => { onTogglePin?.(link); setMenuOpen(false) }}
               className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}

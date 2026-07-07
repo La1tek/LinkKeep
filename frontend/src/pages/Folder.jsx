@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, ArrowLeft, PushPin, CheckSquare, X, Trash, MagnifyingGlass, ListBullets, SquaresFour, FolderPlus, CaretRight, BookOpen, ArrowUpRight, Clipboard } from '@phosphor-icons/react'
+import { Plus, ArrowLeft, PushPin, CheckSquare, X, Trash, MagnifyingGlass, ListBullets, SquaresFour, FolderPlus, CaretRight, BookOpen, ArrowUpRight, Clipboard, LockKey } from '@phosphor-icons/react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTabStore } from '../hooks/useTabStore'
 import { useLinks } from '../hooks/useLinks'
@@ -15,6 +15,8 @@ import { LinkSkeleton } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
 import { openConfirm } from '../components/ConfirmModal'
 import AnimatedCounter from '../components/AnimatedCounter'
+import ArchiveModal from '../components/ArchiveModal'
+import FolderLockModal from '../components/FolderLockModal'
 
 const staggerContainer = {
   hidden: {},
@@ -61,6 +63,8 @@ export default function Folder({ token }) {
   const [healthResult, setHealthResult] = useState(null)
   const [draggedLinkId, setDraggedLinkId] = useState(null)
   const [dragOverLinkId, setDragOverLinkId] = useState(null)
+  const [archiveLink, setArchiveLink] = useState(null)
+  const [folderLockModal, setFolderLockModal] = useState(null)
   const touchStartY = useRef(0)
   const toast = useToast()
   const { mode: viewMode, toggle: toggleViewMode } = useViewMode()
@@ -115,6 +119,7 @@ export default function Folder({ token }) {
 
   const headerTitle = isAll ? 'All Links' : (currentTab ? currentTab.name : 'Folder')
   const accentColor = isAll ? '#6366f1' : (currentTab?.color || '#6366f1')
+  const lockedCurrentFolder = !isAll && currentTab?.is_locked && !currentTab?.is_unlocked
 
   const handleAddLink = async (data) => {
     try {
@@ -148,6 +153,17 @@ export default function Folder({ token }) {
   const handleToggleFav = async (link) => {
     await toggleFav(link.id)
     toast.success(link.is_favorite ? 'Removed from favorites' : 'Added to favorites')
+  }
+
+  const handleArchiveLink = async (link) => {
+    try {
+      toast.success('Archiving link...')
+      await api.archiveLink(link.id)
+      refresh()
+      toast.success('Archive captured')
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   const handleEditLink = async (link) => {
@@ -385,6 +401,8 @@ export default function Folder({ token }) {
         onDelete={handleDeleteLink}
         onToggleFav={handleToggleFav}
         onTogglePin={handleTogglePin}
+        onArchive={handleArchiveLink}
+        onViewArchive={(link) => setArchiveLink(link)}
       />
     </motion.div>
   )
@@ -406,6 +424,8 @@ export default function Folder({ token }) {
         onDelete={handleDeleteLink}
         onToggleFav={handleToggleFav}
         onTogglePin={handleTogglePin}
+        onArchive={handleArchiveLink}
+        onViewArchive={(link) => setArchiveLink(link)}
       />
     </motion.div>
   )
@@ -461,7 +481,7 @@ export default function Folder({ token }) {
               </button>
               {/* Create subfolder button (not in All Links) */}
               {!isAll && (
-                <button onClick={() => setNewSubOpen(true)} className="p-2 rounded-lg transition-colors surface-hover" style={{ color: 'var(--text-muted)' }} title="Create subfolder">
+                <button onClick={() => lockedCurrentFolder ? setFolderLockModal({ tab: currentTab, mode: 'unlock' }) : setNewSubOpen(true)} className="p-2 rounded-lg transition-colors surface-hover" style={{ color: 'var(--text-muted)' }} title="Create subfolder">
                   <FolderPlus size={16} />
                 </button>
               )}
@@ -487,7 +507,7 @@ export default function Folder({ token }) {
               <button onClick={handlePasteSave} className="h-9 w-9 glass rounded-xl active:scale-95 transition-all flex items-center justify-center surface-hover" style={{ color: 'var(--text-muted)' }} title="Paste URL from clipboard">
                 <Clipboard size={18} />
               </button>
-              <button onClick={() => { setEditingLink(null); setModalOpen(true) }} className="h-9 w-9 bg-accent-600 text-white rounded-xl active:scale-95 transition-all flex items-center justify-center hover:bg-accent-500"><Plus size={18} weight="bold" /></button>
+              <button onClick={() => lockedCurrentFolder ? setFolderLockModal({ tab: currentTab, mode: 'unlock' }) : (setEditingLink(null), setModalOpen(true))} className="h-9 w-9 bg-accent-600 text-white rounded-xl active:scale-95 transition-all flex items-center justify-center hover:bg-accent-500"><Plus size={18} weight="bold" /></button>
             </div>
           </div>
 
@@ -525,7 +545,23 @@ export default function Folder({ token }) {
 
       <main className="px-4 sm:px-8 py-4 pb-24 sm:pb-8">
         {/* Subfolder chips */}
-        {!isAll && childTabs.length > 0 && (
+        {lockedCurrentFolder ? (
+          <div className="max-w-lg mx-auto mt-16 glass rounded-2xl p-6 text-center">
+            <div className="h-14 w-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: `${accentColor}20`, border: `1px solid ${accentColor}35`, color: accentColor }}>
+              <LockKey size={26} weight="fill" />
+            </div>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Folder is protected</h2>
+            <p className="text-sm mt-2 leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
+              Enter the folder password to reveal its subfolders and saved links.
+            </p>
+            <button
+              onClick={() => setFolderLockModal({ tab: currentTab, mode: 'unlock' })}
+              className="mt-5 bg-accent-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-accent-500 transition-colors inline-flex items-center gap-2"
+            >
+              <LockKey size={15} weight="fill" /> Unlock folder
+            </button>
+          </div>
+        ) : !isAll && childTabs.length > 0 && (
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
               <h2 className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Subfolders</h2>
@@ -540,12 +576,12 @@ export default function Folder({ token }) {
                     key={child.id}
                     whileHover={{ y: -1 }}
                     whileTap={{ scale: 0.97 }}
-                    onClick={() => navigate(`/folder/${child.id}`)}
+                    onClick={() => child.is_locked && !child.is_unlocked ? setFolderLockModal({ tab: child, mode: 'unlock' }) : navigate(`/folder/${child.id}`)}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs glass transition-all hover:shadow-md"
                     style={{ border: `1px solid ${childColor}25` }}
                   >
                     <div className="h-5 w-5 rounded-lg flex items-center justify-center" style={{ background: `${childColor}20` }}>
-                      <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: childColor }} />
+                      {child.is_locked && !child.is_unlocked ? <LockKey size={11} weight="fill" style={{ color: childColor }} /> : <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: childColor }} />}
                     </div>
                     <span className="font-medium truncate max-w-[120px]" style={{ color: 'var(--text-primary)' }}>{child.name}</span>
                     <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{childLinks}</span>
@@ -559,11 +595,11 @@ export default function Folder({ token }) {
           </div>
         )}
 
-        {loading ? (
+        {!lockedCurrentFolder && loading ? (
           <div className={`${isGrid ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid grid-cols-1 md:grid-cols-2'} gap-3`}>
             {Array.from({ length: 4 }).map((_, i) => <LinkSkeleton key={i} index={i} />)}
           </div>
-        ) : processedLinks.length === 0 ? (
+        ) : !lockedCurrentFolder && processedLinks.length === 0 ? (
           <EmptyState
             title={search ? 'No matching links' : 'No links yet'}
             subtitle={search ? 'Try a different search term' : 'Add your first link to this folder'}
@@ -571,7 +607,7 @@ export default function Folder({ token }) {
             onAction={search ? undefined : () => setModalOpen(true)}
             illustration={search ? 'no-results' : 'no-links'}
           />
-        ) : (
+        ) : !lockedCurrentFolder ? (
           <>
             {pinnedLinks.length > 0 && (
               <div className="space-y-1.5 mb-4">
@@ -589,13 +625,26 @@ export default function Folder({ token }) {
               </motion.div>
             )}
           </>
-        )}
+        ) : null}
       </main>
 
       {/* Floating add button on mobile */}
-      <button onClick={() => { setEditingLink(null); setModalOpen(true) }} onContextMenu={(e) => { e.preventDefault(); handlePasteSave() }} className="sm:hidden fixed bottom-20 right-4 z-40 h-14 w-14 bg-accent-600 text-white rounded-2xl shadow-lg shadow-accent-600/30 flex items-center justify-center active:scale-90 transition-transform" title="Tap: add link, Long press: paste from clipboard"><Plus size={24} weight="bold" /></button>
+      {!lockedCurrentFolder && <button onClick={() => { setEditingLink(null); setModalOpen(true) }} onContextMenu={(e) => { e.preventDefault(); handlePasteSave() }} className="sm:hidden fixed bottom-20 right-4 z-40 h-14 w-14 bg-accent-600 text-white rounded-2xl shadow-lg shadow-accent-600/30 flex items-center justify-center active:scale-90 transition-transform" title="Tap: add link, Long press: paste from clipboard"><Plus size={24} weight="bold" /></button>}
 
       <LinkModal open={modalOpen} onClose={() => { setModalOpen(false); setEditingLink(null) }} onSubmit={handleAddLink} initial={editingLink} tabs={safeTabs} defaultTabId={defaultTabId} />
+      <ArchiveModal
+        open={!!archiveLink}
+        link={archiveLink}
+        onClose={() => setArchiveLink(null)}
+        onArchiveCreated={() => refresh()}
+      />
+      <FolderLockModal
+        open={!!folderLockModal}
+        tab={folderLockModal?.tab}
+        mode={folderLockModal?.mode || 'unlock'}
+        onClose={() => setFolderLockModal(null)}
+        onSuccess={() => { refreshTabs(); refresh() }}
+      />
 
       {/* Reader modal */}
       <AnimatePresence>

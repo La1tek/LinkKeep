@@ -9,6 +9,29 @@
   "background_color": "#09090b",
   "theme_color": "#6366f1",
   "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Search links",
+      "short_name": "Search",
+      "url": "/search",
+      "description": "Search saved links and archives"
+    },
+    {
+      "name": "All links",
+      "short_name": "All",
+      "url": "/folder/all",
+      "description": "Open the full LinkKeep library"
+    }
+  ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
   "icons": [
     {
       "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='192' height='192' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='42' fill='%236366f1'/%3E%3Cpath d='M64 72h64v48H64z' fill='none' stroke='white' stroke-width='8' stroke-linejoin='round'/%3E%3Cpath d='M80 72V60a4 4 0 014-4h24a4 4 0 014 4v12' fill='none' stroke='white' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E",

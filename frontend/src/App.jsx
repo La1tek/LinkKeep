@@ -13,8 +13,10 @@ import Shares from './pages/Shares'
 import Recommendations from './pages/Recommendations'
 import Admin from './pages/Admin'
 import PublicShare from './pages/PublicShare'
+import PublicProfile from './pages/PublicProfile'
 import Sidebar from './components/Sidebar'
 import BottomNav from './components/BottomNav'
+import FolderLockModal from './components/FolderLockModal'
 import { ToastContainer, useToast } from './components/Toast'
 import { ConfirmModal, openConfirm } from './components/ConfirmModal'
 import { useTabStore } from './hooks/useTabStore'
@@ -32,6 +34,7 @@ export default function App() {
   const location = useLocation()
   const toast = useToast()
   const [adminAvailable, setAdminAvailable] = useState(null)
+  const [folderLockModal, setFolderLockModal] = useState(null)
 
   const { tabs, create: createTab, remove: deleteTab, refresh: refreshTabs } = useTabStore()
 
@@ -61,6 +64,13 @@ export default function App() {
   if (location.pathname.startsWith('/share/')) return (
     <>
       <PublicShare />
+      <ToastContainer />
+    </>
+  )
+
+  if (location.pathname.startsWith('/profile/')) return (
+    <>
+      <PublicProfile />
       <ToastContainer />
     </>
   )
@@ -116,6 +126,7 @@ export default function App() {
         onSelectFavorites={() => navigate('/favorites')}
         onCreateTab={createTab}
         onDeleteTab={handleDeleteTab}
+        onUnlockTab={(tab) => setFolderLockModal({ tab, mode: 'unlock' })}
         onLogout={logout}
       />
 
@@ -145,6 +156,13 @@ export default function App() {
       </div>
 
       <BottomNav activePath={location.pathname} onNavigate={navigate} />
+      <FolderLockModal
+        open={!!folderLockModal}
+        tab={folderLockModal?.tab}
+        mode={folderLockModal?.mode || 'unlock'}
+        onClose={() => setFolderLockModal(null)}
+        onSuccess={() => refreshTabs()}
+      />
       <ToastContainer />
       <ConfirmModal />
     </div>

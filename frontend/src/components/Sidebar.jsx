@@ -1,12 +1,12 @@
 import { motion } from 'framer-motion'
-import { Plus, X, FolderSimple, GearSix, SignOut, Star, Stack, CaretDown, CaretRight, Link as LinkIcon, Sparkle, ShieldCheck } from '@phosphor-icons/react'
+import { Plus, X, FolderSimple, GearSix, SignOut, Star, Stack, CaretDown, CaretRight, Link as LinkIcon, Sparkle, ShieldCheck, LockKey } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AnimatedCounter from './AnimatedCounter'
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4']
 
-export default function Sidebar({ tabs, activePath, adminAvailable = false, onSelectTab, onSelectAll, onSelectFavorites, onCreateTab, onDeleteTab, onLogout }) {
+export default function Sidebar({ tabs, activePath, adminAvailable = false, onSelectTab, onSelectAll, onSelectFavorites, onCreateTab, onDeleteTab, onUnlockTab, onLogout }) {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState('#6366f1')
@@ -50,7 +50,8 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
 
   const renderTab = (tab, depth = 0) => {
     const children = childrenMap[tab.id] || []
-    const hasChildren = children.length > 0
+    const locked = tab.is_locked && !tab.is_unlocked
+    const hasChildren = children.length > 0 && !locked
     const isExpanded = expandedIds.has(tab.id)
     const active = isActive(tab.id)
 
@@ -59,8 +60,8 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
         <div className="group relative flex items-center">
           <motion.button
             layout
-            onClick={() => onSelectTab(tab.id)}
-            onDoubleClick={() => { if (hasChildren) toggleExpand(tab.id) }}
+            onClick={() => locked ? onUnlockTab?.(tab) : onSelectTab(tab.id)}
+            onDoubleClick={() => { if (hasChildren && !locked) toggleExpand(tab.id) }}
             className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all surface-hover"
             style={{
               paddingLeft: `${12 + depth * 16}px`,
@@ -69,7 +70,9 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
             }}
           >
             {/* Expand/collapse for parents */}
-            {hasChildren ? (
+            {locked ? (
+              <LockKey size={12} weight="fill" className="shrink-0" style={{ color: 'var(--text-muted)' }} />
+            ) : hasChildren ? (
               <button
                 onClick={(e) => { e.stopPropagation(); toggleExpand(tab.id) }}
                 className="p-0 shrink-0"
@@ -84,7 +87,7 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
             <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: tab.color || '#6366f1' }} />
             <span className="truncate">{tab.name}</span>
             <span className="text-[10px] ml-auto transition-opacity group-hover:opacity-0" style={{ color: 'var(--text-muted)' }}>
-              <AnimatedCounter value={tab.total_link_count ?? tab.link_count} />
+              {locked ? 'locked' : <AnimatedCounter value={tab.total_link_count ?? tab.link_count} />}
             </span>
           </motion.button>
           <button
@@ -97,7 +100,7 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
           </button>
         </div>
         {/* Children */}
-        {hasChildren && isExpanded && (
+        {hasChildren && isExpanded && !locked && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}

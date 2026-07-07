@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
 import FolderCard from '../components/FolderCard'
 import TabEditModal from '../components/TabEditModal'
+import FolderLockModal from '../components/FolderLockModal'
 import SearchBar from '../components/SearchBar'
 import EmptyState from '../components/EmptyState'
 import { useToast } from '../components/Toast'
@@ -43,6 +44,8 @@ export default function Home({ token }) {
   const toast = useToast()
   const [pasting, setPasting] = useState(false)
   const [homeSort, setHomeSort] = useState('newest')
+  const [folderLockModal, setFolderLockModal] = useState(null)
+  const shareTargetHandled = useRef(false)
   const navigate = useNavigate()
 
   const handlePasteSave = async () => {
@@ -84,6 +87,23 @@ export default function Home({ token }) {
   // Get all links (for counts and favicons)
   const { links: allLinks, create: createLink, refresh: refreshLinks } = useLinks(token, {})
   const safeLinks = allLinks || []
+
+  useEffect(() => {
+    if (shareTargetHandled.current) return
+    const params = new URLSearchParams(window.location.search)
+    const sharedText = params.get('text') || ''
+    const sharedUrl = params.get('url') || sharedText.match(/https?:\/\/\S+/i)?.[0]
+    if (!sharedUrl || !/^https?:\/\//i.test(sharedUrl.trim())) return
+    shareTargetHandled.current = true
+    const title = params.get('title') || sharedUrl
+    createLink({ title, url: sharedUrl.trim(), description: sharedText && sharedText !== sharedUrl ? sharedText : null })
+      .then(() => {
+        toast.success('Shared link saved')
+        refreshLinks()
+        window.history.replaceState({}, '', window.location.pathname)
+      })
+      .catch((err) => toast.error(err.message))
+  }, [createLink, refreshLinks, toast])
 
   const safeTabs = tabs || []
 
@@ -262,6 +282,8 @@ export default function Home({ token }) {
                 index={i}
                 onEdit={(t) => setEditTabModal(t)}
                 onDelete={handleDeleteTab}
+                onUnlock={(t) => setFolderLockModal({ tab: t, mode: 'unlock' })}
+                onProtect={(t, mode) => setFolderLockModal({ tab: t, mode })}
               />
             ))}
           </motion.div>
@@ -320,6 +342,13 @@ export default function Home({ token }) {
       )}
 
       <TabEditModal tab={editTabModal} onClose={() => setEditTabModal(null)} onSave={handleEditTabSave} onDelete={handleEditTabDelete} allTabs={safeTabs} />
+      <FolderLockModal
+        open={!!folderLockModal}
+        tab={folderLockModal?.tab}
+        mode={folderLockModal?.mode || 'unlock'}
+        onClose={() => setFolderLockModal(null)}
+        onSuccess={() => { refreshTabs(); refreshLinks() }}
+      />
     </div>
   )
 }

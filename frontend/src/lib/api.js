@@ -1,13 +1,68 @@
 const API_URL = '/api'
+const FOLDER_UNLOCKS_KEY = 'lk_folder_unlocks'
 
 function getToken() {
   return localStorage.getItem('lk_token')
+}
+
+function readFolderUnlocks() {
+  try {
+    const raw = sessionStorage.getItem(FOLDER_UNLOCKS_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeFolderUnlocks(data) {
+  sessionStorage.setItem(FOLDER_UNLOCKS_KEY, JSON.stringify(data || {}))
+}
+
+function getFolderUnlockTokens() {
+  const now = Date.now()
+  const data = readFolderUnlocks()
+  let changed = false
+  const tokens = []
+
+  Object.entries(data).forEach(([tabId, value]) => {
+    if (!value?.token) {
+      delete data[tabId]
+      changed = true
+      return
+    }
+    if (value.expires_at && new Date(value.expires_at).getTime() <= now) {
+      delete data[tabId]
+      changed = true
+      return
+    }
+    tokens.push(value.token)
+  })
+
+  if (changed) writeFolderUnlocks(data)
+  return tokens
+}
+
+function saveFolderUnlock(tabId, token, expiresAt) {
+  if (!tabId || !token) return
+  const data = readFolderUnlocks()
+  data[String(tabId)] = { token, expires_at: expiresAt }
+  writeFolderUnlocks(data)
+}
+
+function clearFolderUnlock(tabId) {
+  const data = readFolderUnlocks()
+  delete data[String(tabId)]
+  writeFolderUnlocks(data)
 }
 
 async function request(path, options = {}) {
   const token = getToken()
   const headers = { ...options.headers }
   if (token) headers['Authorization'] = `Bearer ${token}`
+  const folderUnlocks = getFolderUnlockTokens()
+  if (folderUnlocks.length && options.folderUnlocks !== false) {
+    headers['X-LinkKeep-Folder-Unlocks'] = folderUnlocks.join(',')
+  }
   if (options.body && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json'
     options.body = JSON.stringify(options.body)
@@ -29,6 +84,10 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  getFolderUnlocks: readFolderUnlocks,
+  saveFolderUnlock,
+  clearFolderUnlock,
+
   // Auth
   register: (username, password) =>
     request('/auth/register', { method: 'POST', body: { username, password } }),
@@ -42,13 +101,18 @@ export const api = {
   // Full-text search
   fulltextSearch: (params = {}) => {
     const q = new URLSearchParams()
-    if (params.q) q.set('q', params.q)
-    if (params.tag) q.set('tag', params.tag)
-    if (params.favorite != null) q.set('favorite', params.favorite)
-    if (params.dead != null) q.set('dead', params.dead)
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') q.set(key, value)
+    })
     return request(`/search/fulltext?${q.toString()}`)
   },
   reindexSearch: () => request('/search/reindex', { method: 'POST' }),
+  listSavedSearches: () => request('/search/saved'),
+  createSavedSearch: (data) => request('/search/saved', { method: 'POST', body: data }),
+  deleteSavedSearch: (id) => request(`/search/saved/${id}`, { method: 'DELETE' }),
+  listSmartCollections: () => request('/search/smart'),
+  createSmartCollection: (data) => request('/search/smart', { method: 'POST', body: data }),
+  deleteSmartCollection: (id) => request(`/search/smart/${id}`, { method: 'DELETE' }),
   me: () => request('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),
   listSessions: () => request('/auth/sessions'),
@@ -60,6 +124,9 @@ export const api = {
   updateTab: (id, data) => request(`/tabs/${id}`, { method: 'PUT', body: data }),
   deleteTab: (id, keepLinks = false) => request(`/tabs/${id}?keep_links=${keepLinks}`, { method: 'DELETE' }),
   reorderTabs: (items) => request('/tabs/reorder', { method: 'POST', body: items }),
+  lockTab: (id, password) => request(`/tabs/${id}/lock`, { method: 'POST', body: { password } }),
+  unlockTab: (id, password) => request(`/tabs/${id}/unlock`, { method: 'POST', body: { password } }),
+  unlockTabPermanently: (id, password) => request(`/tabs/${id}/lock`, { method: 'DELETE', body: { password } }),
 
   // Links
   listLinks: (params = {}) => {
@@ -80,6 +147,11 @@ export const api = {
   reorderLinks: (items) => request('/links/reorder', { method: 'POST', body: items }),
   bulkAction: (linkIds, action, tabId = null) =>
     request('/links/bulk', { method: 'POST', body: { link_ids: linkIds, action, tab_id: tabId } }),
+  createHighlight: (linkId, data) => request(`/links/${linkId}/highlights`, { method: 'POST', body: data }),
+  listHighlights: (linkId) => request(`/links/${linkId}/highlights`),
+  archiveLink: (linkId) => request(`/links/${linkId}/archive`, { method: 'POST' }),
+  listArchives: (linkId) => request(`/links/${linkId}/archives`),
+  getArchive: (archiveId) => request(`/archives/${archiveId}`),
 
   // Metadata
   fetchMetadata: (url) => request('/metadata', { method: 'POST', body: { url } }),
@@ -116,7 +188,11 @@ export const api = {
   listShares: () => request('/shares'),
   createShare: (data) => request('/shares', { method: 'POST', body: data }),
   deleteShare: (id) => request(`/shares/${id}`, { method: 'DELETE' }),
+  createShareInvite: (id, data) => request(`/shares/${id}/invites`, { method: 'POST', body: data }),
+  listShareComments: (id) => request(`/shares/${id}/comments`),
+  createShareComment: (id, data) => request(`/shares/${id}/comments`, { method: 'POST', body: data }),
   getPublicShare: (token) => request(`/public/shares/${token}`),
+  getPublicProfile: (username) => request(`/public/profiles/${encodeURIComponent(username)}`),
 
   // Recommendations
   getRecommendations: () => request('/recommendations'),

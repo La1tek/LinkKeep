@@ -54,12 +54,18 @@
     .page-preview .info { flex: 1; min-width: 0; }
     .page-preview .info .title { font-size: 11px; font-weight: 500; word-break: break-word; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .page-preview .info .url { font-size: 9px; color: var(--text-muted); word-break: break-all; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .page-preview .saved-pill { font-size: 9px; padding: 3px 7px; border-radius: 999px; border: 1px solid var(--border-subtle); color: var(--text-muted); white-space: nowrap; }
+    .page-preview .saved-pill.saved { color: var(--green); border-color: rgba(34,197,94,0.25); background: rgba(34,197,94,0.08); }
+    .page-preview .saved-pill.unsaved { color: var(--text-secondary); background: var(--bg-hover); }
 
     .btn { width: 100%; padding: 9px; border: none; border-radius: var(--radius); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
     .btn:active { transform: scale(0.98); }
     .btn-primary { background: var(--accent); color: #fff; }
     .btn-primary:hover { background: var(--accent-hover); }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+    .btn-secondary { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border-subtle); }
+    .btn-secondary:hover { background: var(--bg-hover); }
 
     /* Tabs */
     .tabs { display: flex; border-bottom: 1px solid var(--border-subtle); }
@@ -85,6 +91,9 @@
     .result-item .r-note { font-size: 9px; color: var(--text-secondary); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: italic; }
     .empty-state { padding: 30px 14px; text-align: center; color: var(--text-muted); font-size: 11px; }
     .search-hint { padding: 4px 14px; font-size: 9px; color: var(--text-muted); text-align: center; }
+    .command-wrap { padding: 8px 14px 0; }
+    .command-wrap input { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text); font-size: 12px; outline: none; }
+    .command-wrap input:focus { border-color: var(--accent); }
 
     /* Bottom bar */
     .bottom-bar { padding: 6px 14px 10px; display: flex; gap: 5px; border-top: 1px solid var(--border-subtle); }
@@ -152,6 +161,7 @@
           <div class="title" id="pageTitle">Loading...</div>
           <div class="url" id="pageUrl">—</div>
         </div>
+        <div class="saved-pill" id="pageSavedStatus">Checking</div>
       </div>
       <div class="form">
         <div class="field">
@@ -163,6 +173,13 @@
           <textarea id="noteInput" placeholder="Add a note..." rows="2"></textarea>
         </div>
         <button id="saveBtn" class="btn btn-primary">Save to LinkKeep</button>
+        <div class="quick-actions">
+          <button id="saveAllTabsBtn" class="btn btn-secondary">Save all tabs</button>
+          <button id="saveSessionBtn" class="btn btn-secondary">Save session</button>
+        </div>
+        <div class="command-wrap">
+          <input id="commandInput" placeholder="Command: tabs, session, status, search <query>" />
+        </div>
         <div class="bottom-bar">
           <div class="pill" id="openLinkKeep">📂 Open</div>
           <div class="pill" id="openPanel">📊 Panel</div>

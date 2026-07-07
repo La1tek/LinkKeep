@@ -1,4 +1,4 @@
-import { Star, DotsThreeVertical, ArrowUpRight, Trash, PencilSimple, PushPin, PushPinSlash, NotePencil, Check, GlobeHemisphereWest, BookOpen } from '@phosphor-icons/react'
+import { Star, DotsThreeVertical, ArrowUpRight, Trash, PencilSimple, PushPin, PushPinSlash, NotePencil, Check, GlobeHemisphereWest, BookOpen, Archive } from '@phosphor-icons/react'
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -81,7 +81,20 @@ function StatusDot({ link }) {
   )
 }
 
-export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onTogglePin, onSelect, selected, selectionMode, index = 0 }) {
+function ArchiveStatusBadge({ link }) {
+  if (!link.archive_status) return null
+  const done = link.archive_status === 'completed'
+  const failed = link.archive_status === 'failed'
+  const color = done ? '#22c55e' : failed ? '#ef4444' : '#f59e0b'
+  const label = done ? 'Archived' : failed ? 'Archive failed' : 'Archiving'
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full shrink-0" style={{ color, background: `${color}14`, border: `1px solid ${color}26` }}>
+      <Archive size={10} weight="fill" /> {label}
+    </span>
+  )
+}
+
+export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onTogglePin, onArchive, onViewArchive, onSelect, selected, selectionMode, index = 0 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [showNote, setShowNote] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
@@ -184,6 +197,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
               >{link.title}</h3>
             )}
             {link.is_favorite && <Star size={13} weight="fill" className="text-amber-400 shrink-0" />}
+            <ArchiveStatusBadge link={link} />
           </div>
           {link.description && <p className="text-xs mt-0.5 line-clamp-1" style={{ color: 'var(--text-tertiary)' }}>{link.description}</p>}
           <div className="text-xs mt-1.5 inline-flex items-center gap-1.5 truncate max-w-full">
@@ -248,6 +262,16 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
                     className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
                   >
                     <GlobeHemisphereWest size={13} /> Wayback Machine
+                  </button>
+                  <button onClick={() => { onArchive?.(link); setMenuOpen(false) }}
+                    className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
+                  >
+                    <Archive size={13} /> Archive now
+                  </button>
+                  <button onClick={() => { onViewArchive?.(link); setMenuOpen(false) }}
+                    className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
+                  >
+                    <BookOpen size={13} /> View archive
                   </button>
                   {link.content ? (
                     <button onClick={() => { onEdit?.({ ...link, _showReader: true }); setMenuOpen(false) }}

@@ -3,7 +3,7 @@
   "name": "LinkKeep",
   "version": "2.4.0",
   "description": "Save & search your LinkKeep bookmarks from any page",
-  "permissions": ["activeTab", "storage", "contextMenus", "sidePanel", "bookmarks", "alarms"],
+  "permissions": ["activeTab", "storage", "contextMenus", "sidePanel", "bookmarks", "alarms", "tabs", "tabGroups"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background.js"

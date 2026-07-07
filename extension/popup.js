@@ -50,6 +50,16 @@
     });
   }
 
+  async function background(type, payload = {}) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ type, ...payload }, (res) => {
+        if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+        if (res.ok) resolve(res.data);
+        else reject(new Error(res.data?.detail || 'Request failed'));
+      });
+    });
+  }
+
   async function getActiveTab() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     return tab;
@@ -155,6 +165,14 @@
       $('#faviconImg').src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(u.hostname)}&sz=64`;
     } catch { $('#faviconImg').style.display = 'none'; }
     try {
+      const status = await background('page_status', { url: tab.url });
+      const pill = $('#pageSavedStatus');
+      pill.textContent = status.saved ? 'Saved' : 'Unsaved';
+      pill.className = `saved-pill ${status.saved ? 'saved' : 'unsaved'}`;
+    } catch {
+      $('#pageSavedStatus').textContent = 'Unknown';
+    }
+    try {
       setStatus('Loading...', 'loading');
       const meta = await api('/metadata', 'POST', { url: tab.url });
       $('#titleInput').value = meta.title || tab.title || '';
@@ -175,13 +193,16 @@
     btn.textContent = 'Saving...';
     setStatus('Saving...', 'loading');
     try {
-      await api('/links', 'POST', {
+      await background('save_page', { payload: {
         title: $('#titleInput').value.trim() || tab.title || 'Untitled',
         url: tab.url,
         note: $('#noteInput').value.trim() || undefined,
-      });
+      } });
       setStatus('✓ Saved!', 'success');
       btn.textContent = '✓ Saved!';
+      const pill = $('#pageSavedStatus');
+      pill.textContent = 'Saved';
+      pill.className = 'saved-pill saved';
       setTimeout(() => window.close(), 1000);
     } catch (e) {
       setStatus(e.message, 'error');
@@ -189,6 +210,47 @@
       btn.disabled = false;
       isSaving = false;
     }
+  });
+
+  $('#saveAllTabsBtn').addEventListener('click', async () => {
+    setStatus('Saving all tabs...', 'loading');
+    try {
+      const result = await background('save_all_tabs');
+      setStatus(`Saved ${result.saved} tabs`, 'success');
+    } catch (e) { setStatus(e.message, 'error'); }
+  });
+
+  $('#saveSessionBtn').addEventListener('click', async () => {
+    setStatus('Saving session...', 'loading');
+    try {
+      const result = await background('save_tab_session');
+      setStatus(`Saved ${result.saved} tabs`, 'success');
+    } catch (e) { setStatus(e.message, 'error'); }
+  });
+
+  $('#commandInput').addEventListener('keydown', async (e) => {
+    if (e.key !== 'Enter') return;
+    const command = $('#commandInput').value.trim();
+    if (!command) return;
+    if (command === 'tabs') return $('#saveAllTabsBtn').click();
+    if (command === 'session') return $('#saveSessionBtn').click();
+    if (command === 'status') {
+      const tab = await getActiveTab();
+      const status = await background('page_status', { url: tab.url });
+      setStatus(status.saved ? 'Current page is saved' : 'Current page is unsaved', status.saved ? 'success' : 'loading');
+      return;
+    }
+    if (command.startsWith('search ')) {
+      $$('.tab').forEach(t => t.classList.remove('active'));
+      $('#tabSearch').classList.add('active');
+      $('#saveTab').style.display = 'none';
+      $('#allTab').style.display = 'none';
+      $('#searchTab').style.display = '';
+      $('#searchInput').value = command.slice(7).trim();
+      $('#searchInput').dispatchEvent(new Event('input'));
+      return;
+    }
+    setStatus('Commands: tabs, session, status, search <query>', 'error');
   });
 
   // --- All tab ---
@@ -229,6 +291,10 @@
   // --- Keyboard ---
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.ctrlKey) $('#saveBtn').click();
+    if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+      e.preventDefault();
+      $('#commandInput')?.focus();
+    }
     if (e.key === 'Escape') window.close();
   });
 

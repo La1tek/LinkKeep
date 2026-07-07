@@ -117,6 +117,78 @@ function normalizeUrl(url) {
   }
 }
 
+function setBadge(text, color) {
+  chrome.action.setBadgeText({ text });
+  chrome.action.setBadgeBackgroundColor({ color });
+  setTimeout(() => chrome.action.setBadgeText({ text: '' }), 2000);
+}
+
+async function findLinkByUrl(url) {
+  const existing = await apiFetch(`/links?q=${encodeURIComponent(url)}&limit=10`);
+  const normUrl = normalizeUrl(url);
+  return (existing || []).find(l => normalizeUrl(l.url) === normUrl) || null;
+}
+
+async function saveUrlToLinkKeep({ url, title, note, tabId }) {
+  if (!url || !/^https?:\/\//i.test(url)) throw new Error('Unsupported page URL');
+  const existing = await findLinkByUrl(url).catch(() => null);
+  if (existing) {
+    if (note && !existing.note) await apiFetch(`/links/${existing.id}`, 'PUT', { note });
+    return existing;
+  }
+
+  let meta = {};
+  try { meta = await apiFetch('/metadata', 'POST', { url }); } catch {}
+  return apiFetch('/links', 'POST', {
+    title: meta?.title || title || url,
+    url,
+    note: note || undefined,
+    tab_id: tabId || undefined,
+    description: meta?.description || undefined,
+    favicon: meta?.favicon || undefined,
+    image: meta?.image || undefined,
+  });
+}
+
+async function saveTabsAsFolder(tabs, folderName) {
+  const urls = (tabs || []).filter(t => t.url && /^https?:\/\//i.test(t.url));
+  if (urls.length === 0) throw new Error('No saveable tabs');
+  const folder = await apiFetch('/tabs', 'POST', {
+    name: folderName,
+    color: '#6366f1',
+  });
+  let saved = 0;
+  for (const item of urls) {
+    await saveUrlToLinkKeep({ url: item.url, title: item.title, tabId: folder.id });
+    saved++;
+  }
+  return { saved, folder };
+}
+
+async function saveCurrentWindowTabs() {
+  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const stamp = new Date().toLocaleString();
+  return saveTabsAsFolder(tabs, `Session ${stamp}`);
+}
+
+async function saveCurrentTabGroup(tab) {
+  if (!tab?.groupId || tab.groupId < 0) return saveCurrentWindowTabs();
+  const group = await chrome.tabGroups.get(tab.groupId).catch(() => null);
+  const tabs = await chrome.tabs.query({ groupId: tab.groupId, currentWindow: true });
+  return saveTabsAsFolder(tabs, group?.title ? `Group ${group.title}` : `Tab group ${new Date().toLocaleString()}`);
+}
+
+async function saveSelectedTextAsHighlight(info, tab) {
+  const text = (info.selectionText || '').trim();
+  if (!text) throw new Error('No selected text');
+  const link = await saveUrlToLinkKeep({ url: tab.url, title: tab.title });
+  await apiFetch(`/links/${link.id}/highlights`, 'POST', {
+    text,
+    source_url: tab.url,
+  });
+  return link;
+}
+
 // --- SYNC: LinkKeep → Browser Bookmarks ---
 // Pull all links from LinkKeep and create bookmarks for missing ones
 async function syncFromLinkKeepToBookmarks(folderId, options = {}) {
@@ -368,6 +440,34 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === 'page_status') {
+    findLinkByUrl(msg.url)
+      .then(link => sendResponse({ ok: true, data: { saved: !!link, link } }))
+      .catch(err => sendResponse({ ok: false, data: { detail: err.message } }));
+    return true;
+  }
+
+  if (msg.type === 'save_page') {
+    saveUrlToLinkKeep(msg.payload || {})
+      .then(data => sendResponse({ ok: true, data }))
+      .catch(err => sendResponse({ ok: false, data: { detail: err.message } }));
+    return true;
+  }
+
+  if (msg.type === 'save_all_tabs') {
+    saveCurrentWindowTabs()
+      .then(data => sendResponse({ ok: true, data }))
+      .catch(err => sendResponse({ ok: false, data: { detail: err.message } }));
+    return true;
+  }
+
+  if (msg.type === 'save_tab_session') {
+    chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => saveCurrentTabGroup(tab))
+      .then(data => sendResponse({ ok: true, data }))
+      .catch(err => sendResponse({ ok: false, data: { detail: err.message } }));
+    return true;
+  }
+
   // Sync messages
   if (msg.type === 'sync_status') {
     getSyncSettings().then(settings => {
@@ -409,25 +509,37 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 // --- Context menu ---
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: 'save-page',
-    title: 'Save page to LinkKeep',
-    contexts: ['page', 'link', 'frame']
-  });
-  chrome.contextMenus.create({
-    id: 'save-link',
-    title: 'Save link to LinkKeep',
-    contexts: ['link']
-  });
-  chrome.contextMenus.create({
-    id: 'save-selection',
-    title: 'Save selection as note',
-    contexts: ['selection']
-  });
-  chrome.contextMenus.create({
-    id: 'open-linkkeep',
-    title: 'Open LinkKeep',
-    contexts: ['page']
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'save-page',
+      title: 'Save page to LinkKeep',
+      contexts: ['page', 'link', 'frame']
+    });
+    chrome.contextMenus.create({
+      id: 'save-link',
+      title: 'Save link to LinkKeep',
+      contexts: ['link']
+    });
+    chrome.contextMenus.create({
+      id: 'save-selection',
+      title: 'Save selection as highlight',
+      contexts: ['selection']
+    });
+    chrome.contextMenus.create({
+      id: 'save-all-tabs',
+      title: 'Save all open tabs',
+      contexts: ['page']
+    });
+    chrome.contextMenus.create({
+      id: 'save-tab-session',
+      title: 'Save tab group/session',
+      contexts: ['page']
+    });
+    chrome.contextMenus.create({
+      id: 'open-linkkeep',
+      title: 'Open LinkKeep',
+      contexts: ['page']
+    });
   });
 });
 
@@ -442,33 +554,21 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!server || !token) return;
 
   try {
-    let url, title, note;
     if (info.menuItemId === 'save-link') {
-      url = info.linkUrl;
-      title = info.selectionText || url;
+      await saveUrlToLinkKeep({ url: info.linkUrl, title: info.selectionText || info.linkUrl });
     } else if (info.menuItemId === 'save-selection') {
-      url = tab.url;
-      title = tab.title;
-      note = info.selectionText;
+      await saveSelectedTextAsHighlight(info, tab);
+    } else if (info.menuItemId === 'save-all-tabs') {
+      await saveCurrentWindowTabs();
+    } else if (info.menuItemId === 'save-tab-session') {
+      await saveCurrentTabGroup(tab);
     } else {
-      url = tab.url;
-      title = tab.title;
+      await saveUrlToLinkKeep({ url: tab.url, title: tab.title });
     }
 
-    const meta = await apiFetch('/metadata', 'POST', { url });
-    await apiFetch('/links', 'POST', {
-      title: meta?.title || title,
-      url,
-      note: note || undefined,
-    });
-
-    chrome.action.setBadgeText({ text: '✓' });
-    chrome.action.setBadgeBackgroundColor({ color: '#22c55e' });
-    setTimeout(() => chrome.action.setBadgeText({ text: '' }), 2000);
+    setBadge('✓', '#22c55e');
   } catch {
-    chrome.action.setBadgeText({ text: '✗' });
-    chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
-    setTimeout(() => chrome.action.setBadgeText({ text: '' }), 2000);
+    setBadge('✗', '#ef4444');
   }
 });
 
@@ -488,15 +588,10 @@ chrome.commands.onCommand.addListener(async (cmd) => {
     }
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      const meta = await apiFetch('/metadata', 'POST', { url: tab.url });
-      await apiFetch('/links', 'POST', { title: meta?.title || tab.title, url: tab.url });
-      chrome.action.setBadgeText({ text: '✓' });
-      chrome.action.setBadgeBackgroundColor({ color: '#22c55e' });
-      setTimeout(() => chrome.action.setBadgeText({ text: '' }), 2000);
+      await saveUrlToLinkKeep({ url: tab.url, title: tab.title });
+      setBadge('✓', '#22c55e');
     } catch {
-      chrome.action.setBadgeText({ text: '✗' });
-      chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
-      setTimeout(() => chrome.action.setBadgeText({ text: '' }), 2000);
+      setBadge('✗', '#ef4444');
     }
   }
 });

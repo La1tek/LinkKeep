@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { MagnifyingGlass } from '@phosphor-icons/react'
+import { MagnifyingGlass, Plus, Sparkle, Trash } from '@phosphor-icons/react'
 import { useLinks } from '../hooks/useLinks'
 import { useTabStore } from '../hooks/useTabStore'
 import { api } from '../lib/api'
@@ -15,9 +15,11 @@ export default function Search({ token }) {
   const { tabs } = useTabStore()
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('newest')
-  const [searchMode, setSearchMode] = useState('quick')
+  const [searchMode, setSearchMode] = useState('fulltext')
   const [fulltextLinks, setFulltextLinks] = useState([])
   const [fulltextLoading, setFulltextLoading] = useState(false)
+  const [savedSearches, setSavedSearches] = useState([])
+  const [smartCollections, setSmartCollections] = useState([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editingLink, setEditingLink] = useState(null)
   const toast = useToast()
@@ -42,6 +44,21 @@ export default function Search({ token }) {
     })
     return () => { cancelled = true }
   }, [search, searchMode, toast])
+
+  const refreshCollections = async () => {
+    try {
+      const [saved, smart] = await Promise.all([
+        api.listSavedSearches(),
+        api.listSmartCollections(),
+      ])
+      setSavedSearches(saved.saved_searches || [])
+      setSmartCollections(smart.smart_collections || [])
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  useEffect(() => { refreshCollections() }, [])
 
   const processedLinks = useMemo(() => {
     let r = [...(activeLinks || [])]
@@ -73,6 +90,47 @@ export default function Search({ token }) {
     } catch (err) { toast.error(err.message) }
   }
 
+  const handleSaveSearch = async (type) => {
+    const query = search.trim()
+    if (!query) {
+      toast.error('Type a search query first')
+      return
+    }
+    const name = prompt(type === 'smart' ? 'Smart collection name:' : 'Saved search name:', query)
+    if (!name?.trim()) return
+    try {
+      if (type === 'smart') await api.createSmartCollection({ name: name.trim(), query, color: '#6366f1' })
+      else await api.createSavedSearch({ name: name.trim(), query })
+      await refreshCollections()
+      toast.success(type === 'smart' ? 'Smart collection saved' : 'Search saved')
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const deleteSavedSearch = async (item) => {
+    try {
+      await api.deleteSavedSearch(item.id)
+      setSavedSearches((items) => items.filter((row) => row.id !== item.id))
+      toast.success('Saved search deleted')
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const deleteSmartCollection = async (item) => {
+    try {
+      await api.deleteSmartCollection(item.id)
+      setSmartCollections((items) => items.filter((row) => row.id !== item.id))
+      toast.success('Smart collection deleted')
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const applyQuery = (query) => {
+    setSearch(query)
+    setSearchMode('fulltext')
+  }
+
+  const operatorHints = ['tag:design', 'site:github.com', 'type:article', 'is:dead', 'is:archived', 'has:note', 'before:2026-01-01', 'after:2026-01-01']
+
   return (
     <div className="flex-1 min-h-[100dvh]">
       <header className="sticky top-0 z-30 glass px-4 sm:px-8 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
@@ -97,11 +155,58 @@ export default function Search({ token }) {
         </div>
         <div className="mt-3">
           <SearchBar value={search} onChange={setSearch} autoFocus placeholder="Search all links by title, URL, description..." />
-          <button onClick={handleReindex} className="mt-2 text-[11px] text-accent-400 hover:text-accent-300">Rebuild full-text index</button>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button onClick={handleReindex} className="text-[11px] text-accent-400 hover:text-accent-300">Rebuild full-text index</button>
+            <button onClick={() => handleSaveSearch('saved')} className="text-[11px] text-accent-400 hover:text-accent-300 inline-flex items-center gap-1"><Plus size={11} />Save search</button>
+            <button onClick={() => handleSaveSearch('smart')} className="text-[11px] text-accent-400 hover:text-accent-300 inline-flex items-center gap-1"><Sparkle size={11} />Smart collection</button>
+          </div>
+          <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+            {operatorHints.map((hint) => (
+              <button key={hint} onClick={() => setSearch((value) => value ? `${value} ${hint}` : hint)} className="shrink-0 text-[10px] px-2.5 py-1 rounded-full surface-hover glass" style={{ color: 'var(--text-tertiary)' }}>
+                {hint}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
       <main className="px-4 sm:px-8 py-4 pb-24 sm:pb-8">
+        {(savedSearches.length > 0 || smartCollections.length > 0) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
+            {smartCollections.length > 0 && (
+              <section className="glass rounded-2xl p-3">
+                <h2 className="text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}><Sparkle size={12} /> Smart collections</h2>
+                <div className="space-y-1.5">
+                  {smartCollections.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2 rounded-xl px-2 py-2 surface-hover">
+                      <button onClick={() => applyQuery(item.query)} className="min-w-0 flex-1 text-left">
+                        <p className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>{item.name}</p>
+                        <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{item.query} · {item.count ?? 0} links</p>
+                      </button>
+                      <button onClick={() => deleteSmartCollection(item)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400" aria-label="Delete smart collection"><Trash size={13} /></button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+            {savedSearches.length > 0 && (
+              <section className="glass rounded-2xl p-3">
+                <h2 className="text-xs font-medium uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Saved searches</h2>
+                <div className="space-y-1.5">
+                  {savedSearches.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2 rounded-xl px-2 py-2 surface-hover">
+                      <button onClick={() => applyQuery(item.query)} className="min-w-0 flex-1 text-left">
+                        <p className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>{item.name}</p>
+                        <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{item.query}</p>
+                      </button>
+                      <button onClick={() => deleteSavedSearch(item)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400" aria-label="Delete saved search"><Trash size={13} /></button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        )}
         {activeLoading && search ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{Array.from({ length: 3 }).map((_, i) => <LinkSkeleton key={i} />)}</div>
         ) : search && processedLinks.length === 0 ? (
@@ -110,7 +215,7 @@ export default function Search({ token }) {
           <EmptyState
             icon={<MagnifyingGlass size={40} weight="light" className="text-accent-400/60" />}
             title="Search your links"
-            subtitle="Type to search across all folders by title, URL, or description"
+            subtitle="Use operators like tag:, site:, type:, is:dead, has:note, before:, after:. Full-text search also scans archived readable text."
             illustration="no-results"
           />
         ) : (
