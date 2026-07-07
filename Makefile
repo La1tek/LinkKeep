@@ -1,4 +1,4 @@
-.PHONY: dev test build check migrate migration-status package-extension sync-version clean docker-config
+.PHONY: dev test build check migrate migration-status package-extension sync-version release clean docker-config
 
 dev:
 	docker compose -f docker-compose.dev.yml up --build
@@ -24,6 +24,9 @@ check: test build package-extension
 
 package-extension:
 	./scripts/package-extension.sh
+
+release:
+	./scripts/build-release.sh
 
 sync-version:
 	python3 scripts/sync-version.py
