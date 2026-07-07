@@ -10,6 +10,9 @@
 
     let currentTabId = 'all';
     let allTabs = [];
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[ch]));
 
     // --- Folder tree ---
     function renderTree(tabs) {
@@ -27,7 +30,7 @@
         list.innerHTML += `
           <div class="tree-item ${currentTabId === String(t.id) ? 'active' : ''}" data-id="${t.id}">
             <span class="ti-dot" style="background:${t.color || '#6366f1'}"></span>
-            <span class="ti-name">${t.name}</span>
+            <span class="ti-name">${esc(t.name)}</span>
             <span class="ti-count">${t.total_link_count || t.link_count || 0}</span>
           </div>`;
 
@@ -37,7 +40,7 @@
           list.innerHTML += `
             <div class="tree-item child ${currentTabId === String(c.id) ? 'active' : ''}" data-id="${c.id}">
               <span class="ti-dot" style="background:${c.color || '#6366f1'};opacity:0.7"></span>
-              <span class="ti-name">${c.name}</span>
+              <span class="ti-name">${esc(c.name)}</span>
               <span class="ti-count">${c.total_link_count || c.link_count || 0}</span>
             </div>`;
         });
@@ -72,7 +75,7 @@
       try {
         let links;
         if (search) {
-          links = await api(`/links?search=${encodeURIComponent(search)}&limit=100`);
+          links = await api(`/links?q=${encodeURIComponent(search)}&limit=100`);
           document.getElementById('currentFolder').textContent = `Search: "${search}"`;
         } else {
           const params = currentTabId === 'all' ? '?limit=100' : `?tab_id=${currentTabId}&limit=100`;
@@ -89,17 +92,18 @@
         list.innerHTML = links.map(l => {
           let domain = '';
           try { domain = new URL(l.url).hostname; } catch {}
-          const statusColor = !l.http_status ? '' : l.http_status >= 400 ? 'var(--red)' : l.http_status >= 300 ? 'var(--amber)' : 'var(--green)';
+          const hasStatus = l.http_status !== null && l.http_status !== undefined;
+          const statusColor = !hasStatus ? '' : l.http_status === 0 || l.http_status >= 400 ? 'var(--red)' : l.http_status >= 300 ? 'var(--amber)' : 'var(--green)';
           return `
-            <div class="link-item" data-url="${l.url.replace(/"/g, '&quot;')}">
+            <div class="link-item" data-url="${esc(l.url)}">
               <img class="lf" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32" />
               <div class="li">
                 <div class="lt">
                   ${statusColor ? `<span class="status-dot" style="background:${statusColor}" title="HTTP ${l.http_status}"></span>` : ''}
-                  ${(l.title || 'Untitled').replace(/</g, '&lt;')}
+                  ${esc(l.title || 'Untitled')}
                 </div>
-                <div class="ld">${domain}</div>
-                ${l.note ? `<div class="ln">${l.note.replace(/</g, '&lt;')}</div>` : ''}
+                <div class="ld">${esc(domain)}</div>
+                ${l.note ? `<div class="ln">${esc(l.note)}</div>` : ''}
               </div>
               ${l.is_favorite ? '<span class="lfav">⭐</span>' : ''}
             </div>`;

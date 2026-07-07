@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "LinkKeep",
-  "version": "2.1.0",
+  "version": "2.4.0",
   "description": "Save & search your LinkKeep bookmarks from any page",
-  "permissions": ["activeTab", "storage", "contextMenus", "sidePanel", "bookmarks"],
+  "permissions": ["activeTab", "storage", "contextMenus", "sidePanel", "bookmarks", "alarms"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background.js"

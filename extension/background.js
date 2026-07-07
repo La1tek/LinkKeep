@@ -1,7 +1,9 @@
-// LinkKeep Extension v2.3 — background service worker with bidirectional bookmark sync
+// LinkKeep Extension v2.4 — background service worker with bidirectional bookmark sync
 
 const SYNC_FOLDER = 'LinkKeep';
-const SYNC_INTERVAL = 30_000; // 30 seconds
+const SYNC_ALARM_NAME = 'linkkeep-sync';
+const SYNC_INTERVAL_MINUTES = 1;
+let suppressBookmarkEvents = false;
 
 // --- Storage helpers ---
 function getAuth() {
@@ -85,7 +87,10 @@ async function getOrCreateSyncFolder() {
 function normalizeUrl(url) {
   try {
     const u = new URL(url);
-    return `${u.protocol}//${u.hostname}${u.pathname}`.replace(/\/+$/, '').replace(/^www\./, '');
+    const hostname = u.hostname.replace(/^www\./, '');
+    const port = u.port ? `:${u.port}` : '';
+    const path = u.pathname.replace(/\/+$/, '') || '/';
+    return `${u.protocol}//${hostname}${port}${path}${u.search}`.toLowerCase();
   } catch {
     return url.toLowerCase().trim();
   }
@@ -94,9 +99,6 @@ function normalizeUrl(url) {
 // --- SYNC: LinkKeep → Browser Bookmarks ---
 // Pull all links from LinkKeep and create bookmarks for missing ones
 async function syncFromLinkKeepToBookmarks(folderId) {
-  const { lk_last_sync } = await getSyncSettings();
-  const since = lk_last_sync || '1970-01-01T00:00:00';
-
   let allLinks = [];
   let offset = 0;
   const limit = 100;
@@ -121,34 +123,39 @@ async function syncFromLinkKeepToBookmarks(folderId) {
 
   let created = 0;
   let updated = 0;
-
-  for (const link of allLinks) {
-    const normUrl = normalizeUrl(link.url);
-    const existing = bookmarkMap.get(normUrl);
-
-    if (!existing) {
-      // Create bookmark
-      await chrome.bookmarks.create({
-        parentId: folderId,
-        title: link.title,
-        url: link.url,
-      });
-      created++;
-    } else if (existing.title !== link.title) {
-      // Update title if changed
-      await chrome.bookmarks.update(existing.id, { title: link.title });
-      updated++;
-    }
-  }
-
-  // Remove bookmarks that no longer exist in LinkKeep
-  const linkkeepUrls = new Set(allLinks.map(l => normalizeUrl(l.url)));
   let removed = 0;
-  for (const bm of existingBookmarks) {
-    if (bm.url && !linkkeepUrls.has(normalizeUrl(bm.url))) {
-      await chrome.bookmarks.remove(bm.id);
-      removed++;
+
+  suppressBookmarkEvents = true;
+  try {
+    for (const link of allLinks) {
+      const normUrl = normalizeUrl(link.url);
+      const existing = bookmarkMap.get(normUrl);
+
+      if (!existing) {
+        // Create bookmark
+        await chrome.bookmarks.create({
+          parentId: folderId,
+          title: link.title,
+          url: link.url,
+        });
+        created++;
+      } else if (existing.title !== link.title) {
+        // Update title if changed
+        await chrome.bookmarks.update(existing.id, { title: link.title });
+        updated++;
+      }
     }
+
+    // Remove bookmarks that no longer exist in LinkKeep
+    const linkkeepUrls = new Set(allLinks.map(l => normalizeUrl(l.url)));
+    for (const bm of existingBookmarks) {
+      if (bm.url && !linkkeepUrls.has(normalizeUrl(bm.url))) {
+        await chrome.bookmarks.remove(bm.id);
+        removed++;
+      }
+    }
+  } finally {
+    suppressBookmarkEvents = false;
   }
 
   await setSyncData('lk_last_sync', new Date().toISOString());
@@ -198,7 +205,6 @@ async function syncBookmarkToLinkKeep(bookmark, tabName = null) {
 
 async function removeBookmarkFromLinkKeep(bookmarkUrl) {
   if (!bookmarkUrl) return;
-  const { lk_sync_folder_id } = await getSyncSettings();
 
   const existing = await apiFetch(`/links?q=${encodeURIComponent(bookmarkUrl)}&limit=5`);
   const normUrl = normalizeUrl(bookmarkUrl);
@@ -210,6 +216,7 @@ async function removeBookmarkFromLinkKeep(bookmarkUrl) {
 
 // --- Bookmark event listeners ---
 chrome.bookmarks.onCreated.addListener(async (id, bookmark) => {
+  if (suppressBookmarkEvents) return;
   const { lk_sync_enabled } = await getSyncSettings();
   if (!lk_sync_enabled) return;
   try {
@@ -223,10 +230,11 @@ chrome.bookmarks.onCreated.addListener(async (id, bookmark) => {
 });
 
 chrome.bookmarks.onChanged.addListener(async (id, changeInfo) => {
+  if (suppressBookmarkEvents) return;
   const { lk_sync_enabled } = await getSyncSettings();
   if (!lk_sync_enabled) return;
   try {
-    const bookmark = await chrome.bookmarks.get(id);
+    const [bookmark] = await chrome.bookmarks.get(id);
     if (bookmark.url) {
       await syncBookmarkToLinkKeep(bookmark);
     }
@@ -236,9 +244,12 @@ chrome.bookmarks.onChanged.addListener(async (id, changeInfo) => {
 });
 
 chrome.bookmarks.onRemoved.addListener(async (id, removeInfo) => {
+  if (suppressBookmarkEvents) return;
   const { lk_sync_enabled } = await getSyncSettings();
   if (!lk_sync_enabled) return;
   try {
+    const { lk_sync_folder_id } = await getSyncSettings();
+    if (removeInfo.parentId !== lk_sync_folder_id) return;
     if (removeInfo.node.url) {
       await removeBookmarkFromLinkKeep(removeInfo.node.url);
     }
@@ -246,9 +257,6 @@ chrome.bookmarks.onRemoved.addListener(async (id, removeInfo) => {
     console.error('[LinkKeep Sync] onRemoved error:', e);
   }
 });
-
-// --- Periodic full sync (catches changes from LinkKeep web UI) ---
-let syncTimer = null;
 
 async function runPeriodicSync() {
   const { lk_sync_enabled } = await getSyncSettings();
@@ -265,15 +273,16 @@ async function runPeriodicSync() {
 
 function startSyncTimer() {
   stopSyncTimer();
-  syncTimer = setInterval(runPeriodicSync, SYNC_INTERVAL);
+  chrome.alarms.create(SYNC_ALARM_NAME, { periodInMinutes: SYNC_INTERVAL_MINUTES });
 }
 
 function stopSyncTimer() {
-  if (syncTimer) {
-    clearInterval(syncTimer);
-    syncTimer = null;
-  }
+  chrome.alarms.clear(SYNC_ALARM_NAME);
 }
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === SYNC_ALARM_NAME) runPeriodicSync();
+});
 
 // Start/stop sync based on settings
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -341,7 +350,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const folderId = await getOrCreateSyncFolder();
         await runPeriodicSync();
         const { lk_sync_enabled } = await getSyncSettings();
-        if (lk_sync_enabled && !syncTimer) startSyncTimer();
+        if (lk_sync_enabled) startSyncTimer();
         sendResponse({ ok: true, data: { folderId } });
       } catch (e) {
         sendResponse({ ok: false, data: { detail: e.message } });

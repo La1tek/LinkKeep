@@ -70,10 +70,10 @@ function StatusDot({ link }) {
       </span>
     )
   }
-  const isDead = httpStatus >= 400
+  const isDead = httpStatus === 0 || httpStatus >= 400
   const isRedirect = httpStatus >= 300 && httpStatus < 400
   const color = isDead ? '#ef4444' : isRedirect ? '#fbbf24' : '#22c55e'
-  const title = isDead ? `Dead (${httpStatus})` : isRedirect ? `Redirect (${httpStatus})` : `OK (${httpStatus})`
+  const title = httpStatus === 0 ? 'Unreachable' : isDead ? `Dead (${httpStatus})` : isRedirect ? `Redirect (${httpStatus})` : `OK (${httpStatus})`
   return (
     <span className="inline-flex items-center justify-center shrink-0" style={{ width: 6, height: 6 }} title={title}>
       <span className="block rounded-full" style={{ width: 6, height: 6, backgroundColor: color }} />
@@ -100,7 +100,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
   }
 
   const handleSaveField = (field, value) => {
-    onEdit?.({ ...link, [field]: value })
+    onEdit?.({ ...link, [field]: value, _inlineUpdate: { [field]: value } })
     if (field === 'title') setEditingTitle(false)
     if (field === 'url') setEditingUrl(false)
   }
@@ -261,7 +261,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
             defaultValue={link.note || ''}
             placeholder="Add a note..."
             onBlur={(e) => {
-              onEdit?.({ ...link, note: e.target.value })
+              onEdit?.({ ...link, note: e.target.value, _inlineUpdate: { note: e.target.value } })
               setShowNote(false)
             }}
             autoFocus

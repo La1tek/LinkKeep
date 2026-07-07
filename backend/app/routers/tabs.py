@@ -11,24 +11,57 @@ from app.routers.auth import _get_current_user
 router = APIRouter(prefix="/api/tabs", tags=["tabs"])
 
 
+def _descendant_tab_ids(db: Session, user_id: int, tab_id: int) -> set[int]:
+    descendants = set()
+    pending = [tab_id]
+    while pending:
+        parent = pending.pop()
+        children = db.query(Tab.id).filter(Tab.user_id == user_id, Tab.parent_id == parent).all()
+        for child in children:
+            if child.id not in descendants:
+                descendants.add(child.id)
+                pending.append(child.id)
+    return descendants
+
+
+def _validate_parent(db: Session, user_id: int, tab_id: int | None, parent_id: int | None):
+    if parent_id is None:
+        return
+    parent = db.query(Tab).filter(Tab.id == parent_id, Tab.user_id == user_id).first()
+    if not parent:
+        raise HTTPException(status_code=404, detail="Parent tab not found")
+    if tab_id is not None and parent_id == tab_id:
+        raise HTTPException(status_code=400, detail="A tab cannot be its own parent")
+    if tab_id is not None and parent_id in _descendant_tab_ids(db, user_id, tab_id):
+        raise HTTPException(status_code=400, detail="A tab cannot be moved under its descendant")
+
+
 @router.get("", response_model=List[TabOut])
 def list_tabs(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
     tabs = db.query(Tab).filter(Tab.user_id == user.id).order_by(Tab.sort_order, Tab.id).all()
+    by_parent = {}
+    for t in tabs:
+        by_parent.setdefault(t.parent_id, []).append(t.id)
+
+    def total_links(tab_id: int) -> int:
+        total = db.query(Link).filter(Link.user_id == user.id, Link.tab_id == tab_id).count()
+        for child_id in by_parent.get(tab_id, []):
+            total += total_links(child_id)
+        return total
+
     result = []
     for t in tabs:
         out = TabOut.model_validate(t)
-        out.link_count = db.query(Link).filter(Link.tab_id == t.id).count()
-        out.child_count = db.query(Tab).filter(Tab.parent_id == t.id).count()
-        # Recursive link count: own links + children links
-        child_ids = [c.id for c in db.query(Tab).filter(Tab.parent_id == t.id).all()]
-        child_link_count = db.query(Link).filter(Link.tab_id.in_(child_ids)).count() if child_ids else 0
-        out.total_link_count = out.link_count + child_link_count
+        out.link_count = db.query(Link).filter(Link.user_id == user.id, Link.tab_id == t.id).count()
+        out.child_count = db.query(Tab).filter(Tab.user_id == user.id, Tab.parent_id == t.id).count()
+        out.total_link_count = total_links(t.id)
         result.append(out)
     return result
 
 
 @router.post("", response_model=TabOut, status_code=201)
 def create_tab(tab: TabCreate, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    _validate_parent(db, user.id, None, tab.parent_id)
     max_order = db.query(Tab).filter(Tab.user_id == user.id).count()
     new_tab = Tab(
         name=tab.name,
@@ -51,12 +84,15 @@ def update_tab(tab_id: int, data: TabUpdate, user: User = Depends(_get_current_u
     tab = db.query(Tab).filter(Tab.id == tab_id, Tab.user_id == user.id).first()
     if not tab:
         raise HTTPException(status_code=404, detail="Tab not found")
-    for field, value in data.model_dump(exclude_unset=True).items():
+    update_data = data.model_dump(exclude_unset=True)
+    if "parent_id" in update_data:
+        _validate_parent(db, user.id, tab_id, update_data["parent_id"])
+    for field, value in update_data.items():
         setattr(tab, field, value)
     db.commit()
     db.refresh(tab)
     out = TabOut.model_validate(tab)
-    out.link_count = db.query(Link).filter(Link.tab_id == tab.id).count()
+    out.link_count = db.query(Link).filter(Link.user_id == user.id, Link.tab_id == tab.id).count()
     return out
 
 
@@ -81,6 +117,6 @@ def delete_tab(tab_id: int, keep_links: bool = False, user: User = Depends(_get_
     if not tab:
         raise HTTPException(status_code=404, detail="Tab not found")
     if keep_links:
-        db.query(Link).filter(Link.tab_id == tab_id).update({"tab_id": None})
+        db.query(Link).filter(Link.tab_id == tab_id, Link.user_id == user.id).update({"tab_id": None})
     db.delete(tab)
     db.commit()

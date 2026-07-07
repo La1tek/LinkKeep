@@ -1,19 +1,16 @@
-# LinkKeep Browser Extension v2.0
+# LinkKeep Browser Extension v2.4
 
-A polished Chrome/Firefox extension for quick link saving to your self-hosted LinkKeep instance.
+A Chrome extension for quick link saving and bookmark sync with your self-hosted LinkKeep instance.
 
 ## Features
 
 - 🎨 **Dark UI** matching LinkKeep's glassmorphism design
-- 📁 **Folder selection** with tree view (supports subfolders)
-- 🏷️ **Tag input** with keyboard support (Enter to add, Backspace to remove)
-- 💡 **Suggested tags** — based on your existing tags + domain name
 - 📝 **Notes** — add a quick note when saving
-- ⚡ **Quick Save mode** — one-click save without form (configurable)
 - 🔗 **Metadata auto-fetch** — gets title, description from page
 - 🌐 **Favicon preview** — shows site icon
 - ⌨️ **Keyboard shortcuts** — Ctrl+Enter to save, Esc to close
 - ⚙️ **Settings page** — configure behavior, disconnect
+- 🔄 **Bookmark sync** — optional two-way sync with a dedicated `LinkKeep` bookmarks folder
 
 ## Installation (Chrome / Edge / Brave)
 
@@ -21,14 +18,6 @@ A polished Chrome/Firefox extension for quick link saving to your self-hosted Li
 2. Enable **Developer mode** (top right toggle)
 3. Click **Load unpacked**
 4. Select this `extension/` folder
-
-## Installation (Firefox)
-
-1. Open `about:debugging#/runtime/this-firefox`
-2. Click **Load Temporary Add-on**
-3. Select `manifest.json` from this folder
-
-> ⚠️ Firefox temporary add-ons are removed on browser restart. Use web-ext to build a signed version for permanent installation.
 
 ## First Use
 
@@ -40,16 +29,14 @@ A polished Chrome/Firefox extension for quick link saving to your self-hosted Li
 
 ## Configuration
 
-- **Quick Save mode**: When enabled, links are saved immediately on popup open without showing the form
-- **Auto-fetch metadata**: Automatically fetches page title and description (enabled by default)
+- **Bookmark Sync**: Creates and syncs a dedicated browser bookmarks folder named `LinkKeep`
+- **Auto-fetch metadata**: Automatically fetches page title and description when saving
 
 ## Screenshots
 
 The extension shows:
 - Page title, URL and favicon preview
 - Editable title field
-- Folder tree with color-coded folders and subfolders
-- Tag input with suggestions
 - Optional note field
 - Save button + quick actions
 

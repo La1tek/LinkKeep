@@ -148,6 +148,15 @@ export default function Folder({ token }) {
   }
 
   const handleEditLink = async (link) => {
+    if (link._inlineUpdate) {
+      try {
+        await updateLink(link.id, link._inlineUpdate)
+        toast.success('Link updated')
+      } catch (err) {
+        toast.error(err.message)
+      }
+      return
+    }
     // Handle reader mode actions
     if (link._fetchContent) {
       setReaderLink(link); setReaderContent(''); setReaderLoading(true)
@@ -255,7 +264,16 @@ export default function Folder({ token }) {
     toast.success('Saving...')
     try {
       const tabId = isAll ? null : Number(id)
-      await createLink({ url, tab_id: tabId })
+      let meta = {}
+      try { meta = await api.fetchMetadata(url) } catch {}
+      await createLink({
+        title: meta.title || url,
+        url,
+        tab_id: tabId,
+        description: meta.description || null,
+        favicon: meta.favicon || null,
+        image: meta.image || null,
+      })
       toast.success('Link saved from clipboard')
       refresh()
     } catch (err) {
@@ -270,12 +288,7 @@ export default function Folder({ token }) {
   const handleCheckHealth = async () => {
     setHealthChecking(true); setHealthResult(null)
     try {
-      const params = isAll ? {} : { tab_id: Number(id) }
-      const q = params.tab_id ? `?tab_id=${params.tab_id}` : ''
-      const result = await fetch(`/api/links/check-health${q}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      }).then(r => r.json())
+      const result = await api.checkHealth(isAll ? null : Number(id))
       setHealthResult(result)
       refresh()
       toast.success(`Checked ${result.checked} links: ${result.dead} dead`, 4000)

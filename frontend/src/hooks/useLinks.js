@@ -8,7 +8,7 @@ export function useLinks(token, params = {}) {
   const paramString = JSON.stringify(params)
 
   const refresh = useCallback(async () => {
-    if (!token) return
+    if (!token) { setLinks([]); setLoading(false); return }
     setLoading(true)
     try {
       const data = await api.listLinks(params)

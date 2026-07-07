@@ -1,7 +1,7 @@
 import { MagnifyingGlass, X } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-export default function SearchBar({ value, onChange, autoFocus }) {
+export default function SearchBar({ value, onChange, autoFocus, placeholder = 'Search links...' }) {
   return (
     <div className="relative">
       <MagnifyingGlass size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
@@ -10,7 +10,7 @@ export default function SearchBar({ value, onChange, autoFocus }) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         autoFocus={autoFocus}
-        placeholder="Search links..."
+        placeholder={placeholder}
         className="input-base w-full rounded-xl pl-10 pr-10 py-2.5 text-sm outline-none"
       />
       <AnimatePresence>

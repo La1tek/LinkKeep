@@ -11,6 +11,9 @@
     el._t = setTimeout(() => el.className = 'status', type === 'loading' ? 15000 : 3000);
   };
   const hideStatus = () => { $('#status').className = 'status'; clearTimeout($('#status')._t); };
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]));
 
   function renderLinks(container, links) {
     if (!links || links.length === 0) {
@@ -20,14 +23,15 @@
     container.innerHTML = links.map(l => {
       let domain = '';
       try { domain = new URL(l.url).hostname; } catch {}
-      const statusDot = l.http_status ? (l.http_status >= 400 ? '🔴' : l.http_status >= 300 ? '🟡' : '🟢') : '';
+      const hasStatus = l.http_status !== null && l.http_status !== undefined;
+      const statusDot = hasStatus ? (l.http_status === 0 || l.http_status >= 400 ? '🔴' : l.http_status >= 300 ? '🟡' : '🟢') : '';
       return `
-        <div class="result-item" data-url="${l.url.replace(/"/g, '&quot;')}">
+        <div class="result-item" data-url="${esc(l.url)}">
           <img class="r-favicon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32" />
           <div class="r-info">
-            <div class="r-title">${statusDot} ${(l.title || '').replace(/</g, '&lt;')}</div>
-            <div class="r-url">${domain}</div>
-            ${l.note ? `<div class="r-note">${l.note.replace(/</g, '&lt;')}</div>` : ''}
+            <div class="r-title">${statusDot} ${esc(l.title || '')}</div>
+            <div class="r-url">${esc(domain)}</div>
+            ${l.note ? `<div class="r-note">${esc(l.note)}</div>` : ''}
           </div>
         </div>`;
     }).join('');
@@ -210,7 +214,7 @@
     $('#searchResults').innerHTML = '<div class="empty-state">Searching...</div>';
     searchTimer = setTimeout(async () => {
       try {
-        const links = await api(`/links?search=${encodeURIComponent(q)}&limit=30`);
+        const links = await api(`/links?q=${encodeURIComponent(q)}&limit=30`);
         if (!links || links.length === 0) {
           $('#searchResults').innerHTML = '<div class="empty-state">No results</div>';
           return;

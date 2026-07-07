@@ -1,16 +1,60 @@
 import httpx
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, urljoin
-from typing import Optional
+import ipaddress
+import socket
+
+
+def validate_public_http_url(url: str) -> str:
+    """Return a normalized URL after rejecting local/private network targets."""
+    if not isinstance(url, str):
+        raise ValueError("URL must be a string")
+    value = url.strip()
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("Only http and https URLs are allowed")
+
+    hostname = parsed.hostname
+    try:
+        addresses = [ipaddress.ip_address(hostname)]
+    except ValueError:
+        try:
+            infos = socket.getaddrinfo(hostname, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM)
+        except socket.gaierror as exc:
+            raise ValueError("URL host cannot be resolved") from exc
+        addresses = []
+        for info in infos:
+            address = info[4][0]
+            try:
+                addresses.append(ipaddress.ip_address(address))
+            except ValueError:
+                continue
+
+    if not addresses:
+        raise ValueError("URL host cannot be resolved")
+
+    for address in addresses:
+        if (
+            address.is_private
+            or address.is_loopback
+            or address.is_link_local
+            or address.is_multicast
+            or address.is_reserved
+            or address.is_unspecified
+        ):
+            raise ValueError("Local and private network URLs are not allowed")
+    return value
 
 
 async def fetch_metadata(url: str) -> dict:
     """Fetch title, description, and favicon from a URL."""
+    url = validate_public_http_url(url)
     result = {"title": None, "description": None, "favicon": None, "image": None}
 
     try:
-        async with httpx.AsyncClient(timeout=8, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=8, follow_redirects=True, trust_env=False) as client:
             resp = await client.get(url, headers={"User-Agent": "LinkKeep/1.0"})
+            resp.raise_for_status()
             html = resp.text
 
         soup = BeautifulSoup(html, "html.parser")
@@ -43,7 +87,7 @@ async def fetch_metadata(url: str) -> dict:
         if og_image and og_image.get("content"):
             result["image"] = og_image["content"][:512]
 
-    except Exception:
+    except httpx.HTTPError:
         pass
 
     return result

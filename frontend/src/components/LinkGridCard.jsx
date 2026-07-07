@@ -114,7 +114,7 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
           <textarea
             defaultValue={link.note || ''}
             placeholder="Add a note..."
-            onBlur={(e) => { onEdit?.({ ...link, note: e.target.value }); setShowNote(false) }}
+            onBlur={(e) => { onEdit?.({ ...link, note: e.target.value, _inlineUpdate: { note: e.target.value } }); setShowNote(false) }}
             autoFocus
             className="input-base w-full rounded-lg px-2 py-1 text-xs outline-none resize-none mt-2"
             rows={2}
