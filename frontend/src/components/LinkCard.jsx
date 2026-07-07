@@ -85,10 +85,12 @@ function ArchiveStatusBadge({ link }) {
   if (!link.archive_status) return null
   const done = link.archive_status === 'completed'
   const failed = link.archive_status === 'failed'
-  const color = done ? '#22c55e' : failed ? '#ef4444' : '#f59e0b'
+  const color = done ? 'var(--accent-mint)' : failed ? '#ef4444' : 'var(--accent-amber)'
+  const background = done ? 'rgba(45,212,191,0.12)' : failed ? 'rgba(239,68,68,0.12)' : 'rgba(244,184,102,0.12)'
+  const border = done ? 'rgba(45,212,191,0.22)' : failed ? 'rgba(239,68,68,0.22)' : 'rgba(244,184,102,0.22)'
   const label = done ? 'Archived' : failed ? 'Archive failed' : 'Archiving'
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full shrink-0" style={{ color, background: `${color}14`, border: `1px solid ${color}26` }}>
+    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full shrink-0" style={{ color, background, border: `1px solid ${border}` }}>
       <Archive size={10} weight="fill" /> {label}
     </span>
   )
@@ -144,12 +146,12 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchEnd}
-      className={`group glass rounded-2xl p-4 transition-all surface-hover relative ${selectionMode ? 'cursor-pointer' : ''} ${link.is_pinned ? 'ring-1 ring-accent-500/30' : ''} ${selected ? 'ring-2 ring-accent-500' : ''}`}
+      className={`group archive-slip rounded-2xl p-4 transition-all surface-hover relative ${selectionMode ? 'cursor-pointer' : ''} ${link.is_pinned ? 'ring-1 ring-accent-500/30' : ''} ${selected ? 'ring-2 ring-accent-500' : ''}`}
       style={{ overflow: 'visible' }}
     >
       {/* Pinned indicator */}
       {link.is_pinned && (
-        <div className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-accent-600 flex items-center justify-center shadow-lg">
+        <div className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full flex items-center justify-center shadow-lg" style={{ background: 'var(--accent-primary)' }}>
           <PushPin size={10} weight="fill" className="text-white" />
         </div>
       )}
@@ -170,10 +172,10 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
 
       <div className="flex items-start gap-3">
         <div className="relative shrink-0">
-          <div className="absolute inset-0 blur-md bg-accent-500/5 rounded-lg" />
+          <div className="absolute inset-0 blur-md rounded-lg" style={{ background: 'rgba(124,140,255,0.08)' }} />
           {/* Favicon with tooltip (desktop only) */}
           <div className="relative favicon-tooltip" data-tooltip={`${getDomain(link.url)}${link.created_at ? ' · ' + formatDate(link.created_at) : ''}`}>
-            <img src={favicon} alt="" className="relative h-10 w-10 rounded-xl object-contain p-1.5" style={{ background: 'var(--bg-tertiary)' }}
+            <img src={favicon} alt="" className="relative h-11 w-11 rounded-2xl object-contain p-2" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)' }}
               onError={(e) => { e.target.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(link.url)}&sz=64` }}
             />
           </div>
@@ -191,7 +193,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
               />
             ) : (
               <h3
-                className="text-sm font-medium truncate cursor-default"
+                className="text-sm font-semibold truncate cursor-default"
                 style={{ color: 'var(--text-primary)' }}
                 onDoubleClick={(e) => { if (!isMobile) { e.preventDefault(); setEditingTitle(true) } }}
               >{link.title}</h3>
@@ -200,7 +202,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
             <ArchiveStatusBadge link={link} />
           </div>
           {link.description && <p className="text-xs mt-0.5 line-clamp-1" style={{ color: 'var(--text-tertiary)' }}>{link.description}</p>}
-          <div className="text-xs mt-1.5 inline-flex items-center gap-1.5 truncate max-w-full">
+          <div className="metadata-line text-xs mt-1.5 inline-flex items-center gap-1.5 truncate max-w-full">
             {editingUrl ? (
               <InlineEdit
                 value={link.url}
@@ -211,7 +213,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
               />
             ) : (
               <a href={link.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 truncate max-w-full"
-                style={{ color: 'rgba(129, 140, 248, 0.8)' }}
+                style={{ color: 'var(--accent-primary)' }}
                 onDoubleClick={(e) => { if (!isMobile) { e.preventDefault(); e.stopPropagation(); setEditingUrl(true) } }}
               >
                 <StatusDot link={link} />
@@ -224,7 +226,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
 
         <div className="flex items-center gap-1 shrink-0">
           <button onClick={() => onToggleFav?.(link)}
-            className="p-1.5 rounded-lg transition-colors hover:bg-amber-400/10"
+            className="p-1.5 rounded-xl transition-colors hover:bg-amber-400/10"
             style={{ color: link.is_favorite ? '#fbbf24' : 'var(--text-muted)' }}
           >
             <Star size={16} weight={link.is_favorite ? 'fill' : 'regular'} />
@@ -233,7 +235,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               onBlur={() => setTimeout(() => setMenuOpen(false), 150)}
-              className="p-1.5 rounded-lg transition-colors surface-hover"
+              className="p-1.5 rounded-xl transition-colors surface-hover"
               style={{ color: 'var(--text-muted)' }}
             >
               <DotsThreeVertical size={16} weight="bold" />
@@ -241,7 +243,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
             <AnimatePresence>
               {menuOpen && (
                 <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }}
-                  className="link-menu-open absolute right-0 top-full mt-1 z-[70] glass rounded-xl py-1 min-w-[160px] shadow-xl"
+                  className="link-menu-open absolute right-0 top-full mt-1 z-[70] glass rounded-2xl py-1 min-w-[170px] shadow-xl"
                 >
                   <button onClick={() => { onEdit?.(link); setMenuOpen(false) }}
                     className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
@@ -309,7 +311,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
               setShowNote(false)
             }}
             autoFocus
-            className="input-base w-full rounded-xl px-3 py-2 text-xs outline-none resize-none"
+            className="input-base w-full rounded-2xl px-3 py-2 text-xs outline-none resize-none"
             rows={2}
           />
         </div>
@@ -324,7 +326,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
       {link.tags && link.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-3 ml-13">
           {(link.tags || []).map((tag, i) => (
-            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full surface" style={{ color: 'var(--text-tertiary)' }}>{tag}</span>
+            <span key={i} className="metadata-line text-[10px] px-2 py-0.5 rounded-full surface">{tag}</span>
           ))}
         </div>
       )}

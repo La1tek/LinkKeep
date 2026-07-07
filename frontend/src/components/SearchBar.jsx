@@ -11,7 +11,7 @@ export default function SearchBar({ value, onChange, autoFocus, placeholder = 'S
         onChange={(e) => onChange(e.target.value)}
         autoFocus={autoFocus}
         placeholder={placeholder}
-        className="input-base w-full rounded-xl pl-10 pr-10 py-2.5 text-sm outline-none"
+        className="input-base w-full rounded-2xl pl-10 pr-10 py-2.5 text-sm outline-none"
       />
       <AnimatePresence>
         {value && (
@@ -20,7 +20,7 @@ export default function SearchBar({ value, onChange, autoFocus, placeholder = 'S
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             onClick={() => onChange('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5"
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-lg surface-hover"
             style={{ color: 'var(--text-muted)' }}
           >
             <X size={14} />

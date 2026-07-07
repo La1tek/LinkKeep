@@ -129,7 +129,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-[100dvh]" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+    <div className="cosmos-shell flex min-h-[100dvh]" style={{ color: 'var(--text-primary)' }}>
       <Sidebar
         tabs={tabs || []}
         activePath={location.pathname}

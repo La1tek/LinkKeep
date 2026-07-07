@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, MagnifyingGlass, Star, Stack, CaretDown, CaretRight, FolderSimple, Clipboard } from '@phosphor-icons/react'
+import { Plus, Star, Stack, Clipboard, Sparkle, FolderSimple } from '@phosphor-icons/react'
 import { useNavigate } from 'react-router-dom'
 import { useTabStore } from '../hooks/useTabStore'
 import { useLinks } from '../hooks/useLinks'
@@ -28,6 +28,81 @@ function getFaviconUrl(url) {
   if (!url) return null
   try { return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(getDomain(url))}&sz=32` }
   catch { return null }
+}
+
+function ConstellationMap({ folders, allCount, favCount }) {
+  const positions = [
+    { x: 14, y: 62 }, { x: 30, y: 32 }, { x: 48, y: 54 },
+    { x: 64, y: 24 }, { x: 78, y: 58 }, { x: 88, y: 34 },
+  ]
+  const nodes = (folders.length ? folders : [{ name: 'Inbox', color: '#7c8cff', total_link_count: allCount }])
+    .slice(0, 6)
+    .map((folder, index) => ({
+      ...folder,
+      ...(positions[index] || positions[0]),
+      count: folder.total_link_count ?? folder.link_count ?? 0,
+      color: folder.color || '#7c8cff',
+    }))
+
+  return (
+    <section className="constellation-card atlas-panel rounded-[1.35rem] p-4 sm:p-5 mb-5 min-h-[210px]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="metadata-line text-[10px] uppercase mb-2">quiet observatory</div>
+          <h2 className="text-xl sm:text-2xl font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>Your link sky</h2>
+          <p className="text-xs sm:text-sm mt-1 max-w-md" style={{ color: 'var(--text-tertiary)' }}>
+            {allCount} saved links mapped across {folders.length} folders.
+          </p>
+        </div>
+        <div className="hidden sm:flex gap-2">
+          <div className="rounded-2xl px-3 py-2" style={{ background: 'rgba(124,140,255,0.12)', border: '1px solid rgba(124,140,255,0.2)' }}>
+            <div className="metadata-line text-[9px] uppercase">links</div>
+            <div className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{allCount}</div>
+          </div>
+          <div className="rounded-2xl px-3 py-2" style={{ background: 'rgba(244,184,102,0.12)', border: '1px solid rgba(244,184,102,0.2)' }}>
+            <div className="metadata-line text-[9px] uppercase">stars</div>
+            <div className="text-lg font-semibold" style={{ color: 'var(--accent-amber)' }}>{favCount}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative mt-5 h-28 sm:h-32">
+        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          {nodes.slice(1).map((node, index) => {
+            const prev = nodes[index]
+            return (
+              <line
+                key={`${prev.id || prev.name}-${node.id || node.name}`}
+                x1={prev.x}
+                y1={prev.y}
+                x2={node.x}
+                y2={node.y}
+                stroke="rgba(124,140,255,0.28)"
+                strokeWidth="0.45"
+                strokeDasharray="3 4"
+              />
+            )
+          })}
+        </svg>
+        {nodes.map((node, index) => (
+          <button
+            key={node.id || node.name}
+            type="button"
+            className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-transform hover:scale-110 focus-ring"
+            style={{ left: `${node.x}%`, top: `${node.y}%` }}
+            title={node.name}
+          >
+            <span className="star-node block rounded-full" style={{ width: 9 + Math.min(node.count, 24) / 4, height: 9 + Math.min(node.count, 24) / 4, background: node.color }} />
+            {index < 4 && (
+              <span className="absolute left-4 top-2 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px]" style={{ color: 'var(--text-secondary)', background: 'var(--bg-glass)', border: '1px solid var(--border-subtle)' }}>
+                {node.name}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    </section>
+  )
 }
 
 export default function Home({ token }) {
@@ -182,9 +257,10 @@ export default function Home({ token }) {
 
   return (
     <div className="flex-1 min-h-[100dvh]">
-      <header className="sticky top-0 z-30 glass px-4 sm:px-8 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+      <header className="sticky top-0 z-30 px-4 sm:px-8 py-3" style={{ background: 'var(--bg-glass)', borderBottom: '1px solid var(--border-subtle)', backdropFilter: 'blur(22px)' }}>
         <div className="flex items-center justify-between gap-4">
           <div>
+            <div className="metadata-line text-[9px] uppercase mb-0.5">personal archive</div>
             <h1 className="text-base font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               My Library
             </h1>
@@ -194,7 +270,8 @@ export default function Home({ token }) {
           </div>
           <button
             onClick={() => setNewTabOpen(true)}
-            className="h-9 w-9 bg-accent-600 text-white rounded-xl active:scale-95 transition-all flex items-center justify-center hover:bg-accent-500"
+            className="h-10 w-10 text-white rounded-2xl active:scale-95 transition-all flex items-center justify-center hover:brightness-110"
+            style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-mint))', boxShadow: '0 14px 32px rgba(124,140,255,0.24)' }}
           >
             <Plus size={18} weight="bold" />
           </button>
@@ -203,16 +280,18 @@ export default function Home({ token }) {
           <div className="flex-1">
             <SearchBar value={search} onChange={setSearch} placeholder="Search folders..." />
           </div>
-          <select value={homeSort} onChange={(e) => setHomeSort(e.target.value)} className="glass text-xs rounded-lg px-2 py-2.5 border-none outline-none cursor-pointer shrink-0" style={{ color: 'var(--text-secondary)' }}>
+          <select value={homeSort} onChange={(e) => setHomeSort(e.target.value)} className="glass text-xs rounded-xl px-2 py-2.5 border-none outline-none cursor-pointer shrink-0" style={{ color: 'var(--text-secondary)' }}>
             <option value="newest">Newest</option><option value="oldest">Oldest</option><option value="az">A-Z</option><option value="za">Z-A</option><option value="links">By links ↕</option>
           </select>
-          <button onClick={handlePasteSave} disabled={pasting} className="h-10 w-10 glass rounded-xl active:scale-95 transition-all flex items-center justify-center surface-hover disabled:opacity-40 shrink-0" style={{ color: 'var(--text-muted)' }} title="Paste URL from clipboard">
+          <button onClick={handlePasteSave} disabled={pasting} className="h-10 w-10 glass rounded-2xl active:scale-95 transition-all flex items-center justify-center surface-hover disabled:opacity-40 shrink-0" style={{ color: 'var(--text-muted)' }} title="Paste URL from clipboard">
             <Clipboard size={18} />
           </button>
         </div>
       </header>
 
       <main className="px-4 sm:px-8 py-4 pb-24 sm:pb-8">
+        <ConstellationMap folders={filteredTabs} allCount={allCount} favCount={favCount} />
+
         {/* Quick access: All Links + Favorites */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
           {/* All Links card */}
@@ -221,16 +300,16 @@ export default function Home({ token }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
             onClick={() => navigate('/folder/all')}
-            className="text-left glass rounded-2xl p-4 transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] relative overflow-hidden"
+            className="archive-slip text-left rounded-2xl p-4 transition-all hover:-translate-y-0.5 active:scale-[0.98] relative overflow-hidden"
           >
-            <div className="absolute bottom-0 left-0 right-0 h-1" style={{ background: 'linear-gradient(90deg, #6366f1, #6366f188, transparent)' }} />
+            <div className="absolute bottom-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, var(--accent-primary), transparent)' }} />
             <div className="flex items-center gap-2.5 mb-2">
-              <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)' }}>
+              <div className="h-9 w-9 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(124,140,255,0.15)', border: '1px solid rgba(124,140,255,0.25)' }}>
                 <Stack size={16} weight="fill" className="text-accent-400" />
               </div>
               <div className="min-w-0">
                 <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>All Links</h3>
-                <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>{allCount} links</p>
+                <p className="metadata-line text-[11px]">{allCount} links</p>
               </div>
             </div>
           </motion.button>
@@ -241,17 +320,32 @@ export default function Home({ token }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.05 }}
             onClick={() => navigate('/favorites')}
-            className="text-left glass rounded-2xl p-4 transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] relative overflow-hidden"
+            className="archive-slip text-left rounded-2xl p-4 transition-all hover:-translate-y-0.5 active:scale-[0.98] relative overflow-hidden"
           >
-            <div className="absolute bottom-0 left-0 right-0 h-1" style={{ background: 'linear-gradient(90deg, #fbbf24, #fbbf2488, transparent)' }} />
+            <div className="absolute bottom-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, var(--accent-amber), transparent)' }} />
             <div className="flex items-center gap-2.5 mb-2">
-              <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.25)' }}>
+              <div className="h-9 w-9 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(244,184,102,0.15)', border: '1px solid rgba(244,184,102,0.25)' }}>
                 <Star size={16} weight="fill" className="text-amber-400" />
               </div>
               <div className="min-w-0">
                 <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>Favorites</h3>
-                <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>{favCount} starred</p>
+                <p className="metadata-line text-[11px]">{favCount} starred</p>
               </div>
+            </div>
+          </motion.button>
+          <motion.button
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
+            onClick={() => setNewTabOpen(true)}
+            className="archive-slip hidden sm:flex text-left rounded-2xl p-4 transition-all hover:-translate-y-0.5 active:scale-[0.98] relative overflow-hidden items-center gap-2.5"
+          >
+            <div className="h-9 w-9 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(45,212,191,0.14)', border: '1px solid rgba(45,212,191,0.24)', color: 'var(--accent-mint)' }}>
+              <FolderSimple size={16} weight="fill" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>New sector</h3>
+              <p className="metadata-line text-[11px]">create folder</p>
             </div>
           </motion.button>
         </div>

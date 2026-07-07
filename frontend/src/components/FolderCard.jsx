@@ -74,13 +74,13 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
         tabIndex={0}
         onClick={handleClick}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() } }}
-        className="w-full text-left glass rounded-2xl p-4 transition-all relative overflow-hidden hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98]"
+        className="archive-slip w-full text-left rounded-2xl p-4 transition-all relative overflow-hidden hover:-translate-y-0.5 active:scale-[0.98]"
       >
         {/* Color accent bar at bottom */}
         <div
-          className="absolute bottom-0 left-0 right-0 h-1"
+          className="absolute bottom-0 left-0 right-0 h-px"
           style={{
-            background: `linear-gradient(90deg, ${accentColor}, ${accentColor}88, transparent)`,
+            background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)`,
           }}
         />
 
@@ -88,16 +88,16 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <div
-              className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: `${accentColor}20`, border: `1px solid ${accentColor}30` }}
+              className="h-10 w-10 rounded-2xl flex items-center justify-center shrink-0"
+              style={{ background: `${accentColor}18`, border: `1px solid ${accentColor}36`, boxShadow: `0 0 22px ${accentColor}18` }}
             >
-              {locked ? <LockKey size={16} weight="fill" style={{ color: accentColor }} /> : <div className="h-3 w-3 rounded-full" style={{ backgroundColor: accentColor }} />}
+              {locked ? <LockKey size={16} weight="fill" style={{ color: accentColor }} /> : <div className="star-node h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accentColor }} />}
             </div>
             <div className="min-w-0">
               <h3 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                 {tab.name}
               </h3>
-              <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+              <p className="metadata-line text-[11px]">
                 {locked ? 'Protected' : <><AnimatedCounter value={linkCount} /> {linkCount === 1 ? 'link' : 'links'}</>}
               </p>
             </div>
@@ -116,14 +116,14 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
         {locked && (
           <div className="flex items-center gap-1 mt-2">
             <LockKey size={10} weight="fill" style={{ color: accentColor }} />
-            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Password required</span>
+            <span className="metadata-line text-[10px]">sealed vault</span>
           </div>
         )}
 
         {!locked && (tab.child_count > 0) && (
           <div className="flex items-center gap-1 mt-2">
             <CaretRight size={10} weight="bold" style={{ color: accentColor }} />
-            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{tab.child_count} subfolder{tab.child_count === 1 ? '' : 's'}</span>
+            <span className="metadata-line text-[10px]">{tab.child_count} sector{tab.child_count === 1 ? '' : 's'}</span>
           </div>
         )}
 
@@ -135,13 +135,13 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
                 key={i}
                 src={f.favicon}
                 alt=""
-                className="h-5 w-5 rounded-md object-contain p-0.5"
-                style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)' }}
+                className="h-5 w-5 rounded-lg object-contain p-0.5"
+                style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)', boxShadow: '0 0 12px rgba(124,140,255,0.12)' }}
                 onError={(e) => { e.target.style.display = 'none' }}
               />
             ))}
             {extraCount > 0 && (
-              <span className="text-[10px] ml-0.5" style={{ color: 'var(--text-muted)' }}>+{extraCount}</span>
+              <span className="metadata-line text-[10px] ml-0.5">+{extraCount}</span>
             )}
           </div>
         )}
@@ -154,7 +154,7 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            className="absolute right-2 top-10 z-[75] glass rounded-xl py-1 min-w-[140px] shadow-xl"
+            className="absolute right-2 top-10 z-[75] glass rounded-2xl py-1 min-w-[150px] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <button

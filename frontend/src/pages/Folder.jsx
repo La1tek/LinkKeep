@@ -560,19 +560,20 @@ export default function Folder({ token }) {
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           borderBottom: '1px solid var(--border-subtle)',
-          boxShadow: headerScrolled ? '0 1px 12px rgba(0,0,0,0.06)' : 'none',
+          boxShadow: headerScrolled ? '0 18px 42px rgba(0,0,0,0.12)' : 'none',
         }}
       >
         <div className={`relative transition-all duration-300 ${headerScrolled ? 'px-4 sm:px-8 py-2' : 'px-4 sm:px-8 py-3'}`}>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <button onClick={() => navigate('/')} className="p-2 -ml-2 rounded-lg transition-colors hover:bg-accent-500/10" style={{ color: 'var(--text-tertiary)' }}>
+              <button onClick={() => navigate('/')} className="p-2 -ml-2 rounded-xl transition-colors hover:bg-accent-500/10" style={{ color: 'var(--text-tertiary)' }}>
                 <ArrowLeft size={18} />
               </button>
-              <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: accentColor }} />
+              <div className="star-node h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: accentColor }} />
               <div className="min-w-0">
+                <div className="metadata-line hidden sm:block text-[9px] uppercase">{isAll ? 'complete sky' : 'active sector'}</div>
                 <h1 className={`font-semibold tracking-tight truncate transition-all duration-300 ${headerScrolled ? 'text-sm' : 'text-base'}`} style={{ color: 'var(--text-primary)' }}>{headerTitle}</h1>
-                <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                <p className="metadata-line hidden sm:block text-[11px]">
                   <AnimatedCounter value={processedLinks.length} /> {processedLinks.length === 1 ? 'link' : 'links'}
                   {pinnedLinks.length > 0 && <span className="ml-2 inline-flex items-center gap-0.5"><PushPin size={9} weight="fill" /> <AnimatedCounter value={pinnedLinks.length} /></span>}
                   {activeTag && <span className="text-accent-400 ml-1">#{activeTag}</span>}
@@ -581,41 +582,41 @@ export default function Folder({ token }) {
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               {/* View mode toggle */}
-              <button onClick={toggleViewMode} className="p-2 rounded-lg transition-colors surface-hover" style={{ color: 'var(--text-muted)' }}>
+              <button onClick={toggleViewMode} className="p-2 rounded-xl transition-colors surface-hover" style={{ color: 'var(--text-muted)' }}>
                 {isGrid ? <ListBullets size={16} /> : <SquaresFour size={16} />}
               </button>
-              <button onClick={handleCheckHealth} disabled={healthChecking} className="p-2 rounded-lg transition-colors surface-hover" style={{ color: healthChecking ? 'var(--text-muted)' : healthResult?.dead > 0 ? '#ef4444' : 'var(--text-muted)' }} title="Check link health">
+              <button onClick={handleCheckHealth} disabled={healthChecking} className="hidden sm:block p-2 rounded-xl transition-colors surface-hover" style={{ color: healthChecking ? 'var(--text-muted)' : healthResult?.dead > 0 ? '#ef4444' : 'var(--text-muted)' }} title="Check link health">
                 <span className={`text-[10px] font-bold ${healthChecking ? 'animate-pulse' : ''}`}>{healthChecking ? '...' : healthResult ? `${healthResult.dead}⚡` : '⚡'}</span>
               </button>
               {/* Create subfolder button (not in All Links) */}
               {!isAll && (
-                <button onClick={() => lockedCurrentFolder ? setFolderLockModal({ tab: currentTab, mode: 'unlock' }) : setNewSubOpen(true)} className="p-2 rounded-lg transition-colors surface-hover" style={{ color: 'var(--text-muted)' }} title="Create subfolder">
+                <button onClick={() => lockedCurrentFolder ? setFolderLockModal({ tab: currentTab, mode: 'unlock' }) : setNewSubOpen(true)} className="p-2 rounded-xl transition-colors surface-hover" style={{ color: 'var(--text-muted)' }} title="Create subfolder">
                   <FolderPlus size={16} />
                 </button>
               )}
-              <button onClick={() => setSelectionMode(!selectionMode)} className={`p-2 rounded-lg transition-colors ${selectionMode ? 'bg-accent-600 text-white' : ''}`} style={!selectionMode ? { color: 'var(--text-muted)' } : {}}><CheckSquare size={16} /></button>
+              <button onClick={() => setSelectionMode(!selectionMode)} className={`p-2 rounded-xl transition-colors ${selectionMode ? 'text-white' : ''}`} style={selectionMode ? { background: 'var(--accent-primary)' } : { color: 'var(--text-muted)' }}><CheckSquare size={16} /></button>
               {/* 3-dot menu for folder actions */}
               {!isAll && currentTab && (
                 <div className="relative">
-                  <button onClick={() => setMenuOpen(!menuOpen)} onBlur={() => setTimeout(() => setMenuOpen(false), 150)} className="p-2 rounded-lg transition-colors surface-hover" style={{ color: 'var(--text-muted)' }}>
+                  <button onClick={() => setMenuOpen(!menuOpen)} onBlur={() => setTimeout(() => setMenuOpen(false), 150)} className="p-2 rounded-xl transition-colors surface-hover" style={{ color: 'var(--text-muted)' }}>
                     <Trash size={16} />
                   </button>
                   <AnimatePresence>
                     {menuOpen && (
-                      <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} className="absolute right-0 top-full mt-1 z-20 glass rounded-xl py-1 min-w-[140px] shadow-xl">
+                      <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} className="absolute right-0 top-full mt-1 z-20 glass rounded-2xl py-1 min-w-[140px] shadow-xl">
                         <button onClick={handleDeleteFolder} className="w-full px-3 py-2 text-left text-xs hover:bg-red-500/10 flex items-center gap-2 text-red-400"><Trash size={13} /> Delete folder</button>
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
               )}
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="glass text-xs rounded-lg px-2 py-2 border-none outline-none cursor-pointer" style={{ color: 'var(--text-secondary)' }} aria-label="Sort links">
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="glass text-xs rounded-xl px-2 py-2 border-none outline-none cursor-pointer" style={{ color: 'var(--text-secondary)' }} aria-label="Sort links">
                 <option value="newest">Newest</option><option value="manual">Manual</option><option value="oldest">Oldest</option><option value="az">A-Z</option><option value="za">Z-A</option>
               </select>
-              <button onClick={handlePasteSave} className="h-9 w-9 glass rounded-xl active:scale-95 transition-all flex items-center justify-center surface-hover" style={{ color: 'var(--text-muted)' }} title="Paste URL from clipboard">
+              <button onClick={handlePasteSave} className="hidden sm:flex h-9 w-9 glass rounded-2xl active:scale-95 transition-all items-center justify-center surface-hover" style={{ color: 'var(--text-muted)' }} title="Paste URL from clipboard">
                 <Clipboard size={18} />
               </button>
-              <button onClick={() => lockedCurrentFolder ? setFolderLockModal({ tab: currentTab, mode: 'unlock' }) : (setEditingLink(null), setModalOpen(true))} className="h-9 w-9 bg-accent-600 text-white rounded-xl active:scale-95 transition-all flex items-center justify-center hover:bg-accent-500"><Plus size={18} weight="bold" /></button>
+              <button onClick={() => lockedCurrentFolder ? setFolderLockModal({ tab: currentTab, mode: 'unlock' }) : (setEditingLink(null), setModalOpen(true))} className="h-9 w-9 text-white rounded-2xl active:scale-95 transition-all flex items-center justify-center hover:brightness-110" style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-mint))', boxShadow: '0 14px 32px rgba(124,140,255,0.22)' }}><Plus size={18} weight="bold" /></button>
             </div>
           </div>
 
@@ -626,7 +627,7 @@ export default function Folder({ token }) {
           {allTags.length > 0 && (
             <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
               {activeTag && <button onClick={() => setActiveTag(null)} className="shrink-0 text-[10px] px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">Clear</button>}
-              {allTags.map(tag => <button key={tag} onClick={() => setActiveTag(activeTag === tag ? null : tag)} className="shrink-0 text-[10px] px-2.5 py-1 rounded-full border transition-all glass" style={{ color: 'var(--text-tertiary)', borderColor: activeTag === tag ? 'rgba(99,102,241,0.5)' : 'var(--border-subtle)', background: activeTag === tag ? 'rgba(99,102,241,0.15)' : '' }}>{tag}</button>)}
+              {allTags.map(tag => <button key={tag} onClick={() => setActiveTag(activeTag === tag ? null : tag)} className="metadata-line shrink-0 text-[10px] px-2.5 py-1 rounded-full border transition-all glass" style={{ color: 'var(--text-tertiary)', borderColor: activeTag === tag ? 'rgba(124,140,255,0.5)' : 'var(--border-subtle)', background: activeTag === tag ? 'rgba(124,140,255,0.15)' : '' }}>{tag}</button>)}
             </div>
           )}
         </div>
@@ -636,7 +637,7 @@ export default function Folder({ token }) {
       <AnimatePresence>
         {selectionMode && (
           <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
-            className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 glass rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-xl"
+            className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 atlas-panel rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-xl"
           >
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{selectedIds.length} selected</span>
             <div className="h-4 w-px" style={{ background: 'var(--border-subtle)' }} />
@@ -654,7 +655,7 @@ export default function Folder({ token }) {
       <main className="px-4 sm:px-8 py-4 pb-24 sm:pb-8">
         {/* Subfolder chips */}
         {lockedCurrentFolder ? (
-          <div className="max-w-lg mx-auto mt-16 glass rounded-2xl p-6 text-center">
+          <div className="max-w-lg mx-auto mt-16 atlas-panel rounded-2xl p-6 text-center">
             <div className="h-14 w-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: `${accentColor}20`, border: `1px solid ${accentColor}35`, color: accentColor }}>
               <LockKey size={26} weight="fill" />
             </div>
@@ -664,7 +665,8 @@ export default function Folder({ token }) {
             </p>
             <button
               onClick={() => setFolderLockModal({ tab: currentTab, mode: 'unlock' })}
-              className="mt-5 bg-accent-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-accent-500 transition-colors inline-flex items-center gap-2"
+              className="mt-5 text-white px-4 py-2.5 rounded-2xl text-sm font-medium hover:brightness-110 transition-colors inline-flex items-center gap-2"
+              style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-mint))' }}
             >
               <LockKey size={15} weight="fill" /> Unlock folder
             </button>
@@ -672,7 +674,7 @@ export default function Folder({ token }) {
         ) : !isAll && childTabs.length > 0 && (
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
-              <h2 className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Subfolders</h2>
+              <h2 className="metadata-line text-xs font-medium uppercase tracking-wider">Subfolders</h2>
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{childTabs.length}</span>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -712,7 +714,7 @@ export default function Folder({ token }) {
                     whileHover={{ y: -1 }}
                     whileTap={{ scale: 0.97 }}
                     onClick={() => childLocked ? setFolderLockModal({ tab: child, mode: 'unlock' }) : navigate(`/folder/${child.id}`)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs glass transition-all hover:shadow-md ${childDropActive ? 'scale-[1.03]' : ''}`}
+                    className={`archive-slip flex items-center gap-2 px-3 py-2 rounded-2xl text-xs transition-all hover:shadow-md ${childDropActive ? 'scale-[1.03]' : ''}`}
                     style={{
                       border: `1px solid ${childDropActive ? childColor : `${childColor}25`}`,
                       borderStyle: childDropActive ? 'dashed' : 'solid',
@@ -721,11 +723,11 @@ export default function Folder({ token }) {
                     }}
                     {...childDropHandlers}
                   >
-                    <div className="h-5 w-5 rounded-lg flex items-center justify-center" style={{ background: `${childColor}20` }}>
-                      {childLocked ? <LockKey size={11} weight="fill" style={{ color: childColor }} /> : <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: childColor }} />}
+                    <div className="h-5 w-5 rounded-xl flex items-center justify-center" style={{ background: `${childColor}20` }}>
+                      {childLocked ? <LockKey size={11} weight="fill" style={{ color: childColor }} /> : <div className="star-node h-1.5 w-1.5 rounded-full" style={{ backgroundColor: childColor }} />}
                     </div>
                     <span className="font-medium truncate max-w-[120px]" style={{ color: 'var(--text-primary)' }}>{child.name}</span>
-                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{childLinks}</span>
+                    <span className="metadata-line text-[10px]">{childLinks}</span>
                     {childDropActive && <ArrowSquareIn size={12} weight="fill" style={{ color: childColor }} />}
                     {child.child_count > 0 && (
                       <CaretRight size={10} weight="bold" style={{ color: 'var(--text-muted)' }} />
@@ -771,7 +773,7 @@ export default function Folder({ token }) {
       </main>
 
       {/* Floating add button on mobile */}
-      {!lockedCurrentFolder && <button onClick={() => { setEditingLink(null); setModalOpen(true) }} onContextMenu={(e) => { e.preventDefault(); handlePasteSave() }} className="sm:hidden fixed bottom-20 right-4 z-40 h-14 w-14 bg-accent-600 text-white rounded-2xl shadow-lg shadow-accent-600/30 flex items-center justify-center active:scale-90 transition-transform" title="Tap: add link, Long press: paste from clipboard"><Plus size={24} weight="bold" /></button>}
+      {!lockedCurrentFolder && <button onClick={() => { setEditingLink(null); setModalOpen(true) }} onContextMenu={(e) => { e.preventDefault(); handlePasteSave() }} className="sm:hidden fixed bottom-20 right-4 z-40 h-14 w-14 text-white rounded-2xl flex items-center justify-center active:scale-90 transition-transform" style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-mint))', boxShadow: '0 18px 42px rgba(124,140,255,0.28)' }} title="Tap: add link, Long press: paste from clipboard"><Plus size={24} weight="bold" /></button>}
 
       <LinkModal open={modalOpen} onClose={() => { setModalOpen(false); setEditingLink(null) }} onSubmit={handleAddLink} initial={editingLink} tabs={safeTabs} defaultTabId={defaultTabId} />
       <ArchiveModal

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { FolderSimple, ArrowRight } from '@phosphor-icons/react'
+import { FolderSimple, ArrowRight, Sparkle } from '@phosphor-icons/react'
 import { useAuth } from '../hooks/useAuth'
 
 export default function Login() {
@@ -18,35 +18,43 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center p-4 relative overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-accent-600/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[100px] pointer-events-none" />
+    <div className="cosmos-shell min-h-[100dvh] flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute inset-x-0 top-20 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(124,140,255,0.38), transparent)' }} />
+      <div className="absolute left-8 top-16 hidden h-32 w-48 sm:block">
+        <span className="star-node absolute left-2 top-20 h-2 w-2 rounded-full" style={{ background: 'var(--accent-primary)' }} />
+        <span className="star-node absolute left-24 top-4 h-1.5 w-1.5 rounded-full" style={{ background: 'var(--accent-mint)' }} />
+        <span className="star-node absolute right-3 bottom-3 h-2.5 w-2.5 rounded-full" style={{ background: 'var(--accent-amber)' }} />
+        <span className="absolute left-4 top-20 h-px w-28 rotate-[-32deg]" style={{ background: 'linear-gradient(90deg, rgba(124,140,255,0.45), transparent)' }} />
+        <span className="absolute left-24 top-6 h-px w-28 rotate-[28deg]" style={{ background: 'linear-gradient(90deg, rgba(45,212,191,0.35), transparent)' }} />
+      </div>
 
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }} className="relative w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <div className="h-14 w-14 rounded-2xl bg-accent-600 flex items-center justify-center mb-4">
+          <div className="atlas-logo-mark h-14 w-14 rounded-3xl flex items-center justify-center mb-4">
             <FolderSimple size={28} weight="fill" className="text-white" />
           </div>
+          <div className="metadata-line text-[10px] uppercase mb-1 inline-flex items-center gap-1"><Sparkle size={11} /> quiet observatory</div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>LinkKeep</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>Save, organize, and search your links</p>
         </div>
 
-        <div className="glass rounded-2xl p-6">
+        <div className="atlas-panel rounded-[1.35rem] p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label htmlFor="login-username" className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>Username</label>
+              <label htmlFor="login-username" className="metadata-line text-xs font-medium">Username</label>
               <input id="login-username" type="text" required value={username} onChange={(e) => setUsername(e.target.value)}
-                placeholder="your_username" className="input-base w-full rounded-xl px-4 py-3 text-sm outline-none" />
+                placeholder="your_username" className="input-base w-full rounded-2xl px-4 py-3 text-sm outline-none" />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="login-password" className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>Password</label>
+              <label htmlFor="login-password" className="metadata-line text-xs font-medium">Password</label>
               <input id="login-password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••" className="input-base w-full rounded-xl px-4 py-3 text-sm outline-none" />
+                placeholder="••••••••" className="input-base w-full rounded-2xl px-4 py-3 text-sm outline-none" />
             </div>
             {error && <p className="text-xs text-red-400 bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
             <button type="submit" disabled={loading}
-              className="w-full bg-accent-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-accent-500 active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+              className="w-full text-white py-3 rounded-2xl text-sm font-medium hover:brightness-110 active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-mint))', boxShadow: '0 18px 42px rgba(124,140,255,0.24)' }}>
               {loading ? 'Please wait...' : (<>{mode === 'login' ? 'Sign In' : 'Create Account'}<ArrowRight size={15} /></>)}
             </button>
           </form>

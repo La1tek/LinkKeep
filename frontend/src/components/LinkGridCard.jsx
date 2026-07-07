@@ -10,10 +10,12 @@ function ArchiveStatusBadge({ link }) {
   if (!link.archive_status) return null
   const done = link.archive_status === 'completed'
   const failed = link.archive_status === 'failed'
-  const color = done ? '#22c55e' : failed ? '#ef4444' : '#f59e0b'
+  const color = done ? 'var(--accent-mint)' : failed ? '#ef4444' : 'var(--accent-amber)'
+  const background = done ? 'rgba(45,212,191,0.12)' : failed ? 'rgba(239,68,68,0.12)' : 'rgba(244,184,102,0.12)'
+  const border = done ? 'rgba(45,212,191,0.22)' : failed ? 'rgba(239,68,68,0.22)' : 'rgba(244,184,102,0.22)'
   const label = done ? 'Archived' : failed ? 'Archive failed' : 'Archiving'
   return (
-    <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full mt-2" style={{ color, background: `${color}14`, border: `1px solid ${color}26` }}>
+    <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full mt-2" style={{ color, background, border: `1px solid ${border}` }}>
       <Archive size={9} weight="fill" /> {label}
     </span>
   )
@@ -58,7 +60,7 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchEnd}
-      className={`group glass rounded-2xl overflow-visible transition-all hover:shadow-lg hover:-translate-y-0.5 relative cursor-pointer ${link.is_pinned ? 'ring-1 ring-accent-500/30' : ''} ${selected ? 'ring-2 ring-accent-500' : ''}`}
+      className={`group archive-slip rounded-2xl overflow-visible transition-all hover:-translate-y-0.5 relative cursor-pointer ${link.is_pinned ? 'ring-1 ring-accent-500/30' : ''} ${selected ? 'ring-2 ring-accent-500' : ''}`}
       onClick={(e) => {
         if (selectionMode) { onSelect?.(link); return }
         if (!e.target.closest('button') && !e.target.closest('a')) {
@@ -76,7 +78,7 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
       )}
 
       {/* OG Image or favicon fallback */}
-      <div className="relative w-full aspect-video overflow-hidden rounded-t-2xl" style={{ background: 'var(--bg-tertiary)' }}>
+      <div className="relative w-full aspect-video overflow-hidden rounded-t-2xl" style={{ background: 'linear-gradient(135deg, rgba(124,140,255,0.12), var(--bg-tertiary))' }}>
         {ogImage ? (
           <>
             <img
@@ -87,21 +89,21 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
             />
             {/* Fallback when image fails */}
             <div className="absolute inset-0 items-center justify-center" style={{ display: 'none', background: 'var(--bg-tertiary)' }}>
-              <img src={favicon} alt="" className="h-12 w-12 rounded-xl object-contain p-2" style={{ background: 'var(--bg-secondary)' }} />
+              <img src={favicon} alt="" className="h-12 w-12 rounded-2xl object-contain p-2" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)' }} />
             </div>
             {/* Gradient overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
           </>
         ) : (
           <div className="w-full h-full flex items-center justify-center" style={{ background: 'var(--bg-tertiary)' }}>
-            <img src={favicon} alt="" className="h-12 w-12 rounded-xl object-contain p-2" style={{ background: 'var(--bg-secondary)' }} />
+            <img src={favicon} alt="" className="h-12 w-12 rounded-2xl object-contain p-2" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)' }} />
           </div>
         )}
 
         {/* Fav button overlay */}
         <button
           onClick={(e) => { e.stopPropagation(); onToggleFav?.(link) }}
-          className="absolute top-2 right-2 p-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+          className="absolute top-2 right-2 p-1.5 rounded-xl transition-all opacity-0 group-hover:opacity-100"
           style={{ color: link.is_favorite ? '#fbbf24' : 'rgba(255,255,255,0.7)', background: 'rgba(0,0,0,0.3)' }}
         >
           <Star size={14} weight={link.is_favorite ? 'fill' : 'regular'} />
@@ -115,7 +117,7 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
             <h3 className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
               {link.title}
             </h3>
-            <p className="text-[11px] mt-0.5 truncate flex items-center gap-1" style={{ color: 'var(--text-tertiary)' }}>
+            <p className="metadata-line text-[11px] mt-0.5 truncate flex items-center gap-1">
               {getDomain(link.url)}
               <ArrowUpRight size={10} weight="bold" className="shrink-0 opacity-50" />
             </p>
@@ -124,7 +126,7 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
           <button
             onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen) }}
             onBlur={() => setTimeout(() => setMenuOpen(false), 150)}
-            className="p-1 rounded-lg transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+            className="p-1 rounded-xl transition-colors opacity-0 group-hover:opacity-100 shrink-0"
             style={{ color: 'var(--text-muted)' }}
           >
             <DotsThreeVertical size={14} weight="bold" />
@@ -134,7 +136,7 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
         {link.tags && link.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {link.tags.slice(0, 3).map((tag, i) => (
-              <span key={i} className="text-[9px] px-1.5 py-0.5 rounded-full surface" style={{ color: 'var(--text-muted)' }}>{tag}</span>
+              <span key={i} className="metadata-line text-[9px] px-1.5 py-0.5 rounded-full surface">{tag}</span>
             ))}
             {link.tags.length > 3 && (
               <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ color: 'var(--text-muted)' }}>+{link.tags.length - 3}</span>
@@ -148,7 +150,7 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
             placeholder="Add a note..."
             onBlur={(e) => { onEdit?.({ ...link, note: e.target.value, _inlineUpdate: { note: e.target.value } }); setShowNote(false) }}
             autoFocus
-            className="input-base w-full rounded-lg px-2 py-1 text-xs outline-none resize-none mt-2"
+            className="input-base w-full rounded-2xl px-2 py-1 text-xs outline-none resize-none mt-2"
             rows={2}
           />
         )}
@@ -162,7 +164,7 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.12 }}
-            className="link-menu-open absolute right-2 top-full mt-1 z-[70] glass rounded-xl py-1 min-w-[150px] shadow-xl"
+            className="link-menu-open absolute right-2 top-full mt-1 z-[70] glass rounded-2xl py-1 min-w-[160px] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <button onClick={() => { onEdit?.(link); setMenuOpen(false) }}
@@ -206,7 +208,7 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
 
       {/* Pinned indicator */}
       {link.is_pinned && (
-        <div className="absolute top-2 left-2 h-5 w-5 rounded-full bg-accent-600 flex items-center justify-center shadow-lg">
+        <div className="absolute top-2 left-2 h-5 w-5 rounded-full flex items-center justify-center shadow-lg" style={{ background: 'var(--accent-primary)' }}>
           <PushPin size={10} weight="fill" className="text-white" />
         </div>
       )}
