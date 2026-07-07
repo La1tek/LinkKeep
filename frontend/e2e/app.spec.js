@@ -61,8 +61,9 @@ test('registers and opens the library', async ({ page }) => {
   await page.getByLabel('Password').fill('secret123')
   await page.getByRole('button', { name: /create account/i }).click()
 
-  await expect(page.getByRole('heading', { name: 'My Library' })).toBeVisible()
-  await expect(page.getByText('0 links across 0 folders')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Observatory' })).toBeVisible()
+  await expect(page.getByText('0 links in the vault')).toBeVisible()
+  await expect(page.getByText('No links yet')).toBeVisible()
 })
 
 test('shows sessions, quick import and tag management in settings', async ({ page }) => {

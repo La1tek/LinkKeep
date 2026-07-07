@@ -130,6 +130,11 @@ export default function App() {
 
   return (
     <div className="cosmos-shell flex min-h-[100dvh]" style={{ color: 'var(--text-primary)' }}>
+      <div className="animated-sky" aria-hidden="true">
+        <span className="comet comet-one" />
+        <span className="comet comet-two" />
+        <span className="comet comet-three" />
+      </div>
       <Sidebar
         tabs={tabs || []}
         activePath={location.pathname}
