@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from urllib.parse import urlparse
 
 from app.database import get_db
 from app.models import User, Link, Tab
@@ -25,7 +26,65 @@ class ReorderItem(BaseModel):
     sort_order: int
     tab_id: Optional[int] = None
 
+
+class DuplicateMergeRequest(BaseModel):
+    target_id: int
+    source_ids: List[int]
+
+
 router = APIRouter(prefix="/api/links", tags=["links"])
+
+
+def _normalize_url_for_duplicates(url: str) -> str:
+    parsed = urlparse(url.strip())
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        hostname = (parsed.hostname or "").lower()
+        if hostname.startswith("www."):
+            hostname = hostname[4:]
+        port = f":{parsed.port}" if parsed.port else ""
+        path = parsed.path.rstrip("/") or "/"
+        query = f"?{parsed.query}" if parsed.query else ""
+        return f"{parsed.scheme}://{hostname}{port}{path}{query}".lower()
+    return url.rstrip("/").lower().replace("www.", "")
+
+
+def _merge_tags(*tag_lists) -> list[str]:
+    merged = []
+    seen = set()
+    for tags in tag_lists:
+        for tag in tags or []:
+            value = str(tag).strip()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            merged.append(value[:64])
+    return merged
+
+
+def _merge_notes(current: str | None, incoming: str | None) -> str | None:
+    if not incoming:
+        return current
+    if not current:
+        return incoming
+    if incoming in current:
+        return current
+    return f"{current}\n\n{incoming}"
+
+
+def _merge_source_into_target(target: Link, source: Link) -> None:
+    for field in ("description", "favicon", "image", "content"):
+        if not getattr(target, field) and getattr(source, field):
+            setattr(target, field, getattr(source, field))
+    if target.content_fetched is None and source.content_fetched is not None:
+        target.content_fetched = source.content_fetched
+    if target.http_status is None and source.http_status is not None:
+        target.http_status = source.http_status
+    if target.last_checked is None and source.last_checked is not None:
+        target.last_checked = source.last_checked
+    target.tags = _merge_tags(target.tags, source.tags)
+    target.note = _merge_notes(target.note, source.note)
+    target.is_favorite = bool(target.is_favorite or source.is_favorite)
+    target.is_pinned = bool(target.is_pinned or source.is_pinned)
 
 
 @router.get("", response_model=List[LinkOut])
@@ -189,15 +248,48 @@ def reorder_links(items: List[ReorderItem], user: User = Depends(_get_current_us
 @router.get("/duplicates")
 def find_duplicates(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
     links = db.query(Link).filter(Link.user_id == user.id).all()
-    seen = {}
-    dups = []
-    for l in links:
-        url_norm = l.url.rstrip('/').lower().replace('www.', '')
-        if url_norm in seen:
-            dups.append({"url": l.url, "links": [seen[url_norm], {"id": l.id, "title": l.title}]})
-        else:
-            seen[url_norm] = {"id": l.id, "title": l.title}
+    groups = {}
+    for link in links:
+        url_norm = _normalize_url_for_duplicates(link.url)
+        groups.setdefault(url_norm, []).append({"id": link.id, "title": link.title, "url": link.url})
+    dups = [
+        {"url": group[0]["url"], "links": group}
+        for group in groups.values()
+        if len(group) > 1
+    ]
     return {"duplicates": dups, "count": len(dups)}
+
+
+@router.post("/duplicates/merge")
+def merge_duplicates(
+    data: DuplicateMergeRequest,
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    target = db.query(Link).filter(Link.id == data.target_id, Link.user_id == user.id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Target link not found")
+
+    source_ids = [source_id for source_id in data.source_ids if source_id != target.id]
+    if not source_ids:
+        raise HTTPException(status_code=400, detail="source_ids must contain at least one non-target link")
+
+    sources = db.query(Link).filter(Link.id.in_(source_ids), Link.user_id == user.id).all()
+    if len(sources) != len(set(source_ids)):
+        raise HTTPException(status_code=404, detail="One or more source links were not found")
+
+    target_norm = _normalize_url_for_duplicates(target.url)
+    for source in sources:
+        if _normalize_url_for_duplicates(source.url) != target_norm:
+            raise HTTPException(status_code=400, detail="Only links with the same normalized URL can be merged")
+
+    for source in sources:
+        _merge_source_into_target(target, source)
+        db.delete(source)
+
+    db.commit()
+    db.refresh(target)
+    return {"merged": len(sources), "link": LinkOut.model_validate(target)}
 
 
 # ── Dead Link Checker ──────────────────────────────

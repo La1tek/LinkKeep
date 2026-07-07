@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Moon, Sun, SignOut, User, GithubLogo, Key, Download, Upload, Trash, ArrowRight, TelegramLogo, House, SidebarSimple } from '@phosphor-icons/react'
+import { Moon, Sun, SignOut, User, GithubLogo, Key, Download, Upload, Trash, ArrowRight, TelegramLogo, House, SidebarSimple, Tag } from '@phosphor-icons/react'
 import { useTheme } from '../lib/theme'
 import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
@@ -20,6 +20,9 @@ export default function Settings({ user }) {
   const [botStatus, setBotStatus] = useState(null)
   const [botCommand, setBotCommand] = useState('')
   const [sessions, setSessions] = useState([])
+  const [importMode, setImportMode] = useState('merge')
+  const [tags, setTags] = useState([])
+  const [tagDrafts, setTagDrafts] = useState({})
 
   useEffect(() => {
     api.getStats().then(() => {
@@ -28,6 +31,7 @@ export default function Settings({ user }) {
       }).catch(() => {})
     }).catch(() => {})
     api.listSessions().then(setSessions).catch(() => {})
+    api.listTags().then((data) => setTags(data.tags || [])).catch(() => {})
   }, [])
 
   const handleChangeUsername = async (e) => {
@@ -73,8 +77,8 @@ export default function Settings({ user }) {
     reader.onload = async (ev) => {
       try {
         const data = JSON.parse(ev.target.result)
-        const result = await api.importData(data)
-        toast.success(`Imported ${result.tabs} tabs, ${result.links} links`)
+        const result = await api.importData(data, importMode)
+        toast.success(`Imported ${result.tabs} tabs, ${result.links} links · merged ${result.merged || 0}, skipped ${result.skipped || 0}`)
         setTimeout(() => window.location.reload(), 1500)
       } catch (err) { toast.error('Import failed: ' + err.message) }
     }
@@ -104,6 +108,32 @@ export default function Settings({ user }) {
       setSessions((items) => items.map((item) => item.id === session.id ? { ...item, revoked_at: new Date().toISOString() } : item))
       toast.success(session.current ? 'Current session signed out' : 'Session revoked')
       if (session.current) setTimeout(() => logout(), 300)
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const handleRenameTag = async (tag) => {
+    const nextName = (tagDrafts[tag.name] || '').trim()
+    if (!nextName || nextName === tag.name) return
+    try {
+      await api.renameTag(tag.name, nextName)
+      const data = await api.listTags()
+      setTags(data.tags || [])
+      setTagDrafts({})
+      toast.success('Tag renamed')
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const handleDeleteTag = async (tag) => {
+    const ok = await openConfirm({ title: 'Delete tag?', message: `Remove "${tag.name}" from ${tag.count} links?`, danger: true })
+    if (!ok) return
+    try {
+      await api.deleteTag(tag.name)
+      setTags((items) => items.filter((item) => item.name !== tag.name))
+      toast.success('Tag removed')
     } catch (err) {
       toast.error(err.message)
     }
@@ -189,9 +219,41 @@ export default function Settings({ user }) {
             <button onClick={() => navigate('/duplicates')} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><SidebarSimple size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Find Duplicates</span></div><span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>scan for dupes</span></button>
             <button onClick={handleExport} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><Download size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Export as JSON</span></div><span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>.json</span></button>
             <button onClick={handleExportHtml} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><Download size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Export as HTML Bookmarks</span></div><span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>.html</span></button>
+            <div className="px-4 py-3.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3"><Upload size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Import Mode</span></div>
+              <select value={importMode} onChange={(e) => setImportMode(e.target.value)} className="input-base rounded-lg px-2 py-1 text-xs outline-none">
+                <option value="merge">Merge</option>
+                <option value="skip">Skip existing</option>
+                <option value="replace">Replace all</option>
+              </select>
+            </div>
             <label className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors cursor-pointer"><div className="flex items-center gap-3"><Upload size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Import JSON</span></div><span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>click to select</span><input type="file" accept=".json" onChange={handleImport} className="hidden" /></label>
           </div>
         </Section>
+
+        {tags.length > 0 && (
+          <Section title="Tags">
+            <div className="glass rounded-2xl divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+              {tags.map((tag) => (
+                <div key={tag.name} className="px-4 py-3 flex items-center gap-3">
+                  <Tag size={16} style={{ color: 'var(--text-tertiary)' }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>{tag.name}</p>
+                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{tag.count} links</p>
+                  </div>
+                  <input
+                    value={tagDrafts[tag.name] || ''}
+                    onChange={(e) => setTagDrafts((drafts) => ({ ...drafts, [tag.name]: e.target.value }))}
+                    placeholder="Rename"
+                    className="input-base w-24 rounded-lg px-2 py-1 text-xs outline-none"
+                  />
+                  <button type="button" onClick={() => handleRenameTag(tag)} className="text-xs text-accent-400 px-2 py-1 rounded-lg hover:bg-accent-500/10 transition-colors">Save</button>
+                  <button type="button" onClick={() => handleDeleteTag(tag)} className="text-xs text-red-400 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors">Delete</button>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
 
         <Section title="Telegram Bot">
           <div className="glass rounded-2xl p-4">
