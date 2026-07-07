@@ -82,12 +82,21 @@ export const api = {
   changeUsername: (newUsername) =>
     request('/settings/username', { method: 'PUT', body: { new_username: newUsername } }),
   exportData: () => request('/settings/export'),
-  importData: (data) => request('/settings/import', { method: 'POST', body: data }),
+  backupData: () => request('/settings/backup'),
+  importData: (data, mode = 'merge') => request(`/settings/import?mode=${encodeURIComponent(mode)}`, { method: 'POST', body: data }),
+  restoreData: (data, mode = 'replace') => request(`/settings/restore?mode=${encodeURIComponent(mode)}`, { method: 'POST', body: data }),
   deleteAccount: () => request('/settings/account', { method: 'DELETE' }),
   createBotToken: () => request('/settings/bot-token', { method: 'POST' }),
 
+  // Tags
+  listTags: () => request('/tags'),
+  renameTag: (tag, newName) => request(`/tags/${encodeURIComponent(tag)}`, { method: 'PUT', body: { new_name: newName } }),
+  deleteTag: (tag) => request(`/tags/${encodeURIComponent(tag)}`, { method: 'DELETE' }),
+
   // Duplicates
   findDuplicates: () => request('/links/duplicates'),
+  mergeDuplicates: (targetId, sourceIds) =>
+    request('/links/duplicates/merge', { method: 'POST', body: { target_id: targetId, source_ids: sourceIds } }),
 
   // Health
   checkHealth: (tabId) => {

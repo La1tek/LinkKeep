@@ -443,6 +443,110 @@ class TestSettings:
         assert data["token"]
         assert data["command"] == f"/start {data['token']}"
 
+    def test_import_merge_preserves_existing_link_data(self, client, auth_user):
+        client.post(
+            "/api/links",
+            json={"title": "Existing", "url": "https://example.com", "tags": ["old"], "note": "old note"},
+            headers=auth_user,
+        )
+        payload = {
+            "links": [
+                {
+                    "title": "Imported",
+                    "url": "https://www.example.com/",
+                    "tags": ["new"],
+                    "note": "new note",
+                    "is_favorite": True,
+                }
+            ]
+        }
+        resp = client.post("/api/settings/import?mode=merge", json=payload, headers=auth_user)
+        assert resp.status_code == 200
+        assert resp.json()["merged"] == 1
+
+        links = client.get("/api/links", headers=auth_user).json()
+        assert len(links) == 1
+        assert links[0]["title"] == "Existing"
+        assert set(links[0]["tags"]) == {"old", "new"}
+        assert "old note" in links[0]["note"]
+        assert "new note" in links[0]["note"]
+        assert links[0]["is_favorite"] is True
+
+    def test_import_skip_and_replace_modes(self, client, auth_user):
+        client.post("/api/links", json={"title": "Existing", "url": "https://example.com"}, headers=auth_user)
+        payload = {"links": [{"title": "Skipped", "url": "https://www.example.com/"}]}
+
+        skip = client.post("/api/settings/import?mode=skip", json=payload, headers=auth_user)
+        assert skip.status_code == 200
+        assert skip.json()["skipped"] == 1
+        assert len(client.get("/api/links", headers=auth_user).json()) == 1
+
+        replace_payload = {"links": [{"title": "Replacement", "url": "https://replacement.com"}]}
+        replace = client.post("/api/settings/restore?mode=replace", json=replace_payload, headers=auth_user)
+        assert replace.status_code == 200
+        links = client.get("/api/links", headers=auth_user).json()
+        assert len(links) == 1
+        assert links[0]["title"] == "Replacement"
+
+    def test_tag_management(self, client, auth_user):
+        client.post("/api/links", json={"title": "A", "url": "https://a.com", "tags": ["docs"]}, headers=auth_user)
+        client.post("/api/links", json={"title": "B", "url": "https://b.com", "tags": ["docs", "dev"]}, headers=auth_user)
+
+        tags = client.get("/api/tags", headers=auth_user)
+        assert tags.status_code == 200
+        assert {"name": "docs", "count": 2} in tags.json()["tags"]
+
+        rename = client.put("/api/tags/docs", json={"new_name": "reference"}, headers=auth_user)
+        assert rename.status_code == 200
+        links = client.get("/api/links", headers=auth_user).json()
+        assert sum("reference" in link["tags"] for link in links) == 2
+
+        delete = client.delete("/api/tags/reference", headers=auth_user)
+        assert delete.status_code == 200
+        tags = client.get("/api/tags", headers=auth_user).json()["tags"]
+        assert all(tag["name"] != "reference" for tag in tags)
+
+
+class TestDuplicateMerge:
+    def test_merge_duplicates_preserves_source_data(self, client, auth_user):
+        target = client.post(
+            "/api/links",
+            json={"title": "Target", "url": "https://example.com", "tags": ["target"], "note": "target note"},
+            headers=auth_user,
+        ).json()
+        source = client.post(
+            "/api/links",
+            json={
+                "title": "Source",
+                "url": "https://www.example.com/",
+                "tags": ["source"],
+                "note": "source note",
+                "is_favorite": True,
+                "is_pinned": True,
+                "description": "source description",
+            },
+            headers=auth_user,
+        ).json()
+
+        resp = client.post(
+            "/api/links/duplicates/merge",
+            json={"target_id": target["id"], "source_ids": [source["id"]]},
+            headers=auth_user,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["merged"] == 1
+
+        links = client.get("/api/links", headers=auth_user).json()
+        assert len(links) == 1
+        merged = links[0]
+        assert merged["id"] == target["id"]
+        assert set(merged["tags"]) == {"target", "source"}
+        assert "target note" in merged["note"]
+        assert "source note" in merged["note"]
+        assert merged["is_favorite"] is True
+        assert merged["is_pinned"] is True
+        assert merged["description"] == "source description"
+
 
 class TestMetadataSecurity:
     def test_metadata_rejects_localhost_url(self, client, auth_user):

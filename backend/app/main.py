@@ -11,7 +11,7 @@ import asyncio
 from app.database import Base, get_db, engine
 from app.migrations import run_startup_migrations
 from app.middleware import RateLimitMiddleware, RequestContextMiddleware, SecurityHeadersMiddleware
-from app.routers import auth, tabs, links, metadata, stats, settings
+from app.routers import auth, tabs, links, metadata, stats, settings, tags
 from app.config import CORS_ORIGINS, CORS_ORIGIN_REGEX
 from app.version import APP_VERSION
 
@@ -55,6 +55,7 @@ app.include_router(links.router)
 app.include_router(metadata.router)
 app.include_router(stats.router)
 app.include_router(settings.router)
+app.include_router(tags.router)
 
 
 @app.get("/api/health")

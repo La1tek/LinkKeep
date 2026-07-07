@@ -40,21 +40,20 @@ export default function Duplicates({ token }) {
   useEffect(() => { fetchDuplicates() }, [fetchDuplicates])
 
   const handleMerge = async (dup, keepId) => {
-    const removeId = dup.links.find(l => l.id !== keepId)?.id
-    if (!removeId) return
+    const removeIds = dup.links.filter(l => l.id !== keepId).map(l => l.id)
+    if (removeIds.length === 0) return
 
     const keep = dup.links.find(l => l.id === keepId)
     const ok = await openConfirm({
       title: 'Merge duplicates?',
-      message: `Keep "${keep?.title}" (ID ${keepId}) and delete the duplicate?`,
+      message: `Keep "${keep?.title}" (ID ${keepId}) and merge ${removeIds.length} duplicate ${removeIds.length === 1 ? 'link' : 'links'} into it?`,
     })
     if (!ok) return
 
     setMerging({ url: dup.url })
     try {
-      // Delete the duplicate link
-      await api.deleteLink(removeId)
-      toast.success('Merged — duplicate removed')
+      await api.mergeDuplicates(keepId, removeIds)
+      toast.success('Merged — duplicate data preserved')
       await refreshLinks()
       await fetchDuplicates()
     } catch (err) {
