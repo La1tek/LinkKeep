@@ -44,6 +44,19 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+class SessionOut(BaseModel):
+    id: int
+    user_agent: Optional[str] = None
+    ip_address: Optional[str] = None
+    created_at: datetime
+    expires_at: datetime
+    revoked_at: Optional[datetime] = None
+    current: bool = False
+
+    class Config:
+        from_attributes = True
+
+
 # ── Tab ──────────────────────────────────────────────
 
 class TabBase(BaseModel):

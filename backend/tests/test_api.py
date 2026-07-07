@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app import config as app_config
 from app.database import Base, get_db
 from app.main import app
 
@@ -93,6 +94,31 @@ class TestAuth:
     def test_me_unauthorized(self, client):
         resp = client.get("/api/auth/me")
         assert resp.status_code == 401
+
+    def test_register_can_be_disabled(self, client, monkeypatch):
+        monkeypatch.setattr(app_config, "ALLOW_REGISTRATION", False)
+        resp = client.post("/api/auth/register", json={"username": "blocked", "password": "pass"})
+        assert resp.status_code == 403
+
+    def test_logout_revokes_current_session(self, client, auth_user):
+        sessions = client.get("/api/auth/sessions", headers=auth_user)
+        assert sessions.status_code == 200
+        assert len(sessions.json()) == 1
+        assert sessions.json()[0]["current"] is True
+
+        logout = client.post("/api/auth/logout", headers=auth_user)
+        assert logout.status_code == 204
+
+        me = client.get("/api/auth/me", headers=auth_user)
+        assert me.status_code == 401
+
+    def test_can_revoke_session_by_id(self, client, auth_user):
+        sessions = client.get("/api/auth/sessions", headers=auth_user).json()
+        session_id = sessions[0]["id"]
+        resp = client.delete(f"/api/auth/sessions/{session_id}", headers=auth_user)
+        assert resp.status_code == 204
+        me = client.get("/api/auth/me", headers=auth_user)
+        assert me.status_code == 401
 
 
 # ── Tab Tests ────────────────────────────────────────
@@ -380,6 +406,17 @@ class TestHealth:
         assert data["status"] == "ok"
         assert "version" in data
         assert "bot" in data
+
+    def test_ready(self, client):
+        resp = client.get("/api/ready")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ready"
+
+    def test_security_headers(self, client):
+        resp = client.get("/api/health")
+        assert resp.headers["X-Content-Type-Options"] == "nosniff"
+        assert resp.headers["X-Frame-Options"] == "DENY"
+        assert resp.headers["X-Request-ID"]
 
 
 class TestSettings:
