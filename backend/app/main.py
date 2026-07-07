@@ -1,15 +1,21 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+import logging
+
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 import os
 import threading
 import asyncio
 
-from app.database import Base, engine
+from app.database import Base, get_db, engine
 from app.migrations import run_startup_migrations
+from app.middleware import RateLimitMiddleware, RequestContextMiddleware, SecurityHeadersMiddleware
 from app.routers import auth, tabs, links, metadata, stats, settings
 from app.config import CORS_ORIGINS, CORS_ORIGIN_REGEX
 from app.version import APP_VERSION
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 
 @asynccontextmanager
@@ -29,6 +35,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="LinkKeep API", version=APP_VERSION, lifespan=lifespan)
+
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestContextMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,3 +60,12 @@ app.include_router(settings.router)
 @app.get("/api/health")
 def health():
     return {"status": "ok", "version": APP_VERSION, "bot": bool(os.getenv("TELEGRAM_BOT_TOKEN", ""))}
+
+
+@app.get("/api/ready")
+def ready(db=Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Database is not ready") from exc
+    return {"status": "ready", "version": APP_VERSION}

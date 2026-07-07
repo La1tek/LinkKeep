@@ -18,6 +18,7 @@ class User(Base):
 
     tabs = relationship("Tab", back_populates="owner", cascade="all, delete-orphan")
     links = relationship("Link", back_populates="owner", cascade="all, delete-orphan")
+    sessions = relationship("SessionToken", back_populates="owner", cascade="all, delete-orphan")
 
 
 class Tab(Base):
@@ -62,3 +63,18 @@ class Link(Base):
 
     owner = relationship("User", back_populates="links")
     tab = relationship("Tab", back_populates="links")
+
+
+class SessionToken(Base):
+    __tablename__ = "sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_jti = Column(String(128), unique=True, index=True, nullable=False)
+    user_agent = Column(String(512), nullable=True)
+    ip_address = Column(String(64), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+
+    owner = relationship("User", back_populates="sessions")

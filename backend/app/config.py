@@ -15,3 +15,8 @@ CORS_ORIGINS = [
     if origin.strip()
 ]
 CORS_ORIGIN_REGEX = os.getenv("CORS_ORIGIN_REGEX", r"^chrome-extension://.*$")
+ALLOW_REGISTRATION = os.getenv("ALLOW_REGISTRATION", "true").lower() in {"1", "true", "yes", "on"}
+RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
+RATE_LIMIT_AUTH_PER_MINUTE = int(os.getenv("RATE_LIMIT_AUTH_PER_MINUTE", "120"))
+RATE_LIMIT_METADATA_PER_MINUTE = int(os.getenv("RATE_LIMIT_METADATA_PER_MINUTE", "120"))
+RATE_LIMIT_HEAVY_PER_5_MINUTES = int(os.getenv("RATE_LIMIT_HEAVY_PER_5_MINUTES", "30"))

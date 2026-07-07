@@ -39,6 +39,9 @@ export const api = {
     return request('/auth/login', { method: 'POST', body: form })
   },
   me: () => request('/auth/me'),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  listSessions: () => request('/auth/sessions'),
+  revokeSession: (id) => request(`/auth/sessions/${id}`, { method: 'DELETE' }),
 
   // Tabs
   listTabs: () => request('/tabs'),

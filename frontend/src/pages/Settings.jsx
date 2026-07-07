@@ -19,6 +19,7 @@ export default function Settings({ user }) {
   const [newPassword, setNewPassword] = useState('')
   const [botStatus, setBotStatus] = useState(null)
   const [botCommand, setBotCommand] = useState('')
+  const [sessions, setSessions] = useState([])
 
   useEffect(() => {
     api.getStats().then(() => {
@@ -26,6 +27,7 @@ export default function Settings({ user }) {
         setBotStatus(data)
       }).catch(() => {})
     }).catch(() => {})
+    api.listSessions().then(setSessions).catch(() => {})
   }, [])
 
   const handleChangeUsername = async (e) => {
@@ -96,6 +98,17 @@ export default function Settings({ user }) {
     }
   }
 
+  const handleRevokeSession = async (session) => {
+    try {
+      await api.revokeSession(session.id)
+      setSessions((items) => items.map((item) => item.id === session.id ? { ...item, revoked_at: new Date().toISOString() } : item))
+      toast.success(session.current ? 'Current session signed out' : 'Session revoked')
+      if (session.current) setTimeout(() => logout(), 300)
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
   return (
     <div className="flex-1 min-h-[100dvh]">
       <header className="sticky top-0 z-30 glass px-4 sm:px-8 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
@@ -139,6 +152,26 @@ export default function Settings({ user }) {
                 <button type="button" onClick={() => setEditing(null)} className="glass px-4 py-2 rounded-xl text-sm surface-hover" style={{ color: 'var(--text-secondary)' }}>Cancel</button>
               </div>
             </motion.form>
+          )}
+          {sessions.length > 0 && (
+            <div className="glass rounded-2xl divide-y mt-2" style={{ borderColor: 'var(--border-subtle)' }}>
+              {sessions.map((session) => (
+                <div key={session.id} className="px-4 py-3 flex items-center gap-3">
+                  <div className={`h-2 w-2 rounded-full ${session.revoked_at ? 'bg-zinc-500' : 'bg-emerald-400'}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>{session.user_agent || 'Unknown device'}</p>
+                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      {session.current ? 'Current session · ' : ''}{session.ip_address || 'unknown ip'} · {new Date(session.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  {!session.revoked_at && (
+                    <button type="button" onClick={() => handleRevokeSession(session)} className="text-xs text-red-400 px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors">
+                      Revoke
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </Section>
 
