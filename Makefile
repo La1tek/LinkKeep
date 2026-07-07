@@ -1,4 +1,4 @@
-.PHONY: dev test build check package-extension sync-version clean docker-config
+.PHONY: dev test build check migrate migration-status package-extension sync-version clean docker-config
 
 dev:
 	docker compose -f docker-compose.dev.yml up --build
@@ -8,6 +8,12 @@ test:
 
 build:
 	cd frontend && npm run build
+
+migrate:
+	cd backend && alembic upgrade head
+
+migration-status:
+	cd backend && alembic current
 
 check: test build package-extension
 	node --check extension/background.js

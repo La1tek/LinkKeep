@@ -38,7 +38,16 @@ Backend:
 ```bash
 cd backend
 pip install -r requirements.txt -r requirements-dev.txt
+alembic upgrade head
 pytest
+```
+
+Useful root commands:
+
+```bash
+make migrate
+make check
+make package-extension
 ```
 
 Frontend:

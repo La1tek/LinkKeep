@@ -7,6 +7,8 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:9091}
       - DATABASE_URL=sqlite:////data/linkkeep.db
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-true}
+      - RUN_MIGRATIONS=${RUN_MIGRATIONS:-true}
     volumes:
       - ./data:/data
     restart: unless-stopped
