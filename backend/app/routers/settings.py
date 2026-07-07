@@ -1,4 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+import csv
+import io
+import json
+
+from bs4 import BeautifulSoup
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import Literal, List
@@ -8,10 +13,11 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from app.database import get_db
-from app.models import User, Tab, Link
+from app.models import BackupSnapshot, User, Tab, Link
 from app.schemas import LinkOut, TabOut, UserOut
 from app.auth import get_password_hash, verify_password
 from app.routers.auth import _get_current_user
+from app import config
 from app.version import APP_VERSION
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -32,7 +38,12 @@ class ImportData(BaseModel):
     mode: Literal["skip", "merge", "replace"] | None = None
 
 
+class SnapshotCreate(BaseModel):
+    name: str | None = Field(default=None, max_length=160)
+
+
 ImportMode = Literal["skip", "merge", "replace"]
+ImportSource = Literal["bookmarks_html", "pocket_json", "raindrop_csv", "generic_json"]
 
 
 def _normalize_url(url: str) -> str:
@@ -208,6 +219,88 @@ def _import_user_data(data: ImportData, user: User, db: Session, mode: ImportMod
     return {"message": "Import complete", **result}
 
 
+def _links_from_bookmarks_html(raw: str) -> list[dict]:
+    soup = BeautifulSoup(raw, "html.parser")
+    links = []
+    for anchor in soup.find_all("a"):
+        href = (anchor.get("href") or "").strip()
+        if not href:
+            continue
+        links.append({
+            "title": anchor.get_text(strip=True) or href,
+            "url": href,
+            "tags": ["imported"],
+        })
+    return links
+
+
+def _links_from_pocket_json(raw: str) -> list[dict]:
+    data = json.loads(raw)
+    if isinstance(data, dict):
+        items = data.get("list", data.get("items", data))
+        if isinstance(items, dict):
+            items = list(items.values())
+    else:
+        items = data
+    links = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        url = item.get("given_url") or item.get("resolved_url") or item.get("url")
+        if not url:
+            continue
+        links.append({
+            "title": item.get("given_title") or item.get("resolved_title") or item.get("title") or url,
+            "url": url,
+            "tags": _clean_tags((item.get("tags") or {}).keys() if isinstance(item.get("tags"), dict) else item.get("tags", [])),
+        })
+    return links
+
+
+def _links_from_raindrop_csv(raw: str) -> list[dict]:
+    rows = csv.DictReader(io.StringIO(raw))
+    links = []
+    for row in rows:
+        url = row.get("url") or row.get("link") or row.get("URL")
+        if not url:
+            continue
+        tags = row.get("tags") or row.get("Tags") or ""
+        links.append({
+            "title": row.get("title") or row.get("Title") or url,
+            "url": url,
+            "description": row.get("excerpt") or row.get("description") or row.get("Description"),
+            "tags": _clean_tags(tags.replace("|", ",").split(",")),
+        })
+    return links
+
+
+def _parse_import_file(source: ImportSource, raw: str) -> ImportData:
+    if source == "bookmarks_html":
+        return ImportData(links=_links_from_bookmarks_html(raw))
+    if source == "pocket_json":
+        return ImportData(links=_links_from_pocket_json(raw))
+    if source == "raindrop_csv":
+        return ImportData(links=_links_from_raindrop_csv(raw))
+    data = json.loads(raw)
+    if isinstance(data, list):
+        return ImportData(links=data)
+    return ImportData(**data)
+
+
+def _trim_backup_snapshots(db: Session, user_id: int) -> int:
+    snapshots = (
+        db.query(BackupSnapshot)
+        .filter(BackupSnapshot.user_id == user_id)
+        .order_by(BackupSnapshot.created_at.desc(), BackupSnapshot.id.desc())
+        .all()
+    )
+    removed = 0
+    for snapshot in snapshots[config.BACKUP_SNAPSHOT_RETENTION:]:
+        db.delete(snapshot)
+        removed += 1
+    return removed
+
+
 @router.put("/password")
 def change_password(data: ChangePassword, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
     if not verify_password(data.current_password, user.hashed_password):
@@ -268,6 +361,79 @@ def restore_data(
     db: Session = Depends(get_db),
 ):
     return _import_user_data(data, user, db, data.mode or mode)
+
+
+@router.post("/import-file")
+async def import_file(
+    source: ImportSource,
+    mode: ImportMode = "merge",
+    file: UploadFile = File(...),
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    raw = (await file.read()).decode("utf-8", errors="replace")
+    try:
+        data = _parse_import_file(source, raw)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Cannot parse import file: {exc}") from exc
+    return _import_user_data(data, user, db, data.mode or mode)
+
+
+@router.get("/snapshots")
+def list_snapshots(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    snapshots = (
+        db.query(BackupSnapshot)
+        .filter(BackupSnapshot.user_id == user.id)
+        .order_by(BackupSnapshot.created_at.desc(), BackupSnapshot.id.desc())
+        .all()
+    )
+    return {
+        "snapshots": [
+            {"id": snapshot.id, "name": snapshot.name, "created_at": snapshot.created_at}
+            for snapshot in snapshots
+        ]
+    }
+
+
+@router.post("/snapshots", status_code=201)
+def create_snapshot(
+    data: SnapshotCreate | None = None,
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    snapshot = BackupSnapshot(
+        user_id=user.id,
+        name=(data.name if data else None) or f"Snapshot {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        data=_export_user_data(user, db),
+    )
+    db.add(snapshot)
+    db.flush()
+    removed = _trim_backup_snapshots(db, user.id)
+    db.commit()
+    db.refresh(snapshot)
+    return {"id": snapshot.id, "name": snapshot.name, "created_at": snapshot.created_at, "removed_old": removed}
+
+
+@router.post("/snapshots/{snapshot_id}/restore")
+def restore_snapshot(
+    snapshot_id: int,
+    mode: ImportMode = "replace",
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    snapshot = db.query(BackupSnapshot).filter(BackupSnapshot.id == snapshot_id, BackupSnapshot.user_id == user.id).first()
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return _import_user_data(ImportData(**snapshot.data), user, db, mode)
+
+
+@router.delete("/snapshots/{snapshot_id}", status_code=204)
+def delete_snapshot(snapshot_id: int, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    snapshot = db.query(BackupSnapshot).filter(BackupSnapshot.id == snapshot_id, BackupSnapshot.user_id == user.id).first()
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    db.delete(snapshot)
+    db.commit()
 
 
 @router.delete("/account", status_code=204)

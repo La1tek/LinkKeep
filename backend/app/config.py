@@ -20,3 +20,13 @@ RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() in {"1", "t
 RATE_LIMIT_AUTH_PER_MINUTE = int(os.getenv("RATE_LIMIT_AUTH_PER_MINUTE", "120"))
 RATE_LIMIT_METADATA_PER_MINUTE = int(os.getenv("RATE_LIMIT_METADATA_PER_MINUTE", "120"))
 RATE_LIMIT_HEAVY_PER_5_MINUTES = int(os.getenv("RATE_LIMIT_HEAVY_PER_5_MINUTES", "30"))
+ADMIN_USERNAMES = {
+    username.strip()
+    for username in os.getenv("ADMIN_USERNAMES", "").split(",")
+    if username.strip()
+}
+JOB_WORKER_ENABLED = os.getenv("JOB_WORKER_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+JOB_WORKER_INTERVAL_SECONDS = int(os.getenv("JOB_WORKER_INTERVAL_SECONDS", "10"))
+BACKUP_SNAPSHOTS_ENABLED = os.getenv("BACKUP_SNAPSHOTS_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
+BACKUP_SNAPSHOT_INTERVAL_HOURS = int(os.getenv("BACKUP_SNAPSHOT_INTERVAL_HOURS", "24"))
+BACKUP_SNAPSHOT_RETENTION = int(os.getenv("BACKUP_SNAPSHOT_RETENTION", "10"))

@@ -11,6 +11,7 @@ from app.schemas import (
 )
 from app.routers.auth import _get_current_user
 from app.services.link_service import validate_public_http_url
+from app.services.search_index import upsert_link_index
 
 from pydantic import BaseModel
 import time
@@ -142,6 +143,8 @@ def create_link(link: LinkCreate, user: User = Depends(_get_current_user), db: S
     db.add(new_link)
     db.commit()
     db.refresh(new_link)
+    upsert_link_index(db, new_link)
+    db.commit()
     return new_link
 
 
@@ -157,6 +160,7 @@ def update_link(link_id: int, data: LinkUpdate, user: User = Depends(_get_curren
             raise HTTPException(status_code=404, detail="Tab not found")
     for field, value in update_data.items():
         setattr(link, field, value)
+    upsert_link_index(db, link)
     db.commit()
     db.refresh(link)
     return link
@@ -386,6 +390,7 @@ def fetch_link_content(
 
     link.content = text[:500_000]
     link.content_fetched = datetime.now(timezone.utc)
+    upsert_link_index(db, link)
     db.commit()
     db.refresh(link)
 

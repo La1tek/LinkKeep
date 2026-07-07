@@ -11,8 +11,9 @@ import asyncio
 from app.database import Base, get_db, engine
 from app.migrations import run_startup_migrations
 from app.middleware import RateLimitMiddleware, RequestContextMiddleware, SecurityHeadersMiddleware
-from app.routers import auth, tabs, links, metadata, stats, settings, tags
-from app.config import CORS_ORIGINS, CORS_ORIGIN_REGEX
+from app.routers import admin, auth, jobs, links, metadata, recommendations, search, settings, shares, stats, tabs, tags
+from app.config import CORS_ORIGINS, CORS_ORIGIN_REGEX, JOB_WORKER_ENABLED
+from app.services.jobs import start_job_worker
 from app.version import APP_VERSION
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -22,6 +23,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     run_startup_migrations(engine)
+    stop_job_worker = threading.Event()
+    job_thread = None
+    if JOB_WORKER_ENABLED:
+        job_thread = start_job_worker(stop_job_worker)
     # Start Telegram bot if token is set
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
     if bot_token:
@@ -32,6 +37,9 @@ async def lifespan(app: FastAPI):
         )
         bot_thread.start()
     yield
+    stop_job_worker.set()
+    if job_thread:
+        job_thread.join(timeout=2)
 
 
 app = FastAPI(title="LinkKeep API", version=APP_VERSION, lifespan=lifespan)
@@ -56,6 +64,12 @@ app.include_router(metadata.router)
 app.include_router(stats.router)
 app.include_router(settings.router)
 app.include_router(tags.router)
+app.include_router(jobs.router)
+app.include_router(search.router)
+app.include_router(shares.router)
+app.include_router(shares.public_router)
+app.include_router(recommendations.router)
+app.include_router(admin.router)
 
 
 @app.get("/api/health")
