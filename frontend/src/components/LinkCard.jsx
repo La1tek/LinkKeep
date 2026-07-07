@@ -105,15 +105,33 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
     if (field === 'url') setEditingUrl(false)
   }
 
+  const handleSelectionClick = (e) => {
+    if (!selectionMode || e.target.closest('[data-selection-checkbox]')) return
+    e.preventDefault()
+    e.stopPropagation()
+    onSelect?.(link)
+  }
+
+  const handleSelectionKeyDown = (e) => {
+    if (!selectionMode || (e.key !== 'Enter' && e.key !== ' ')) return
+    e.preventDefault()
+    onSelect?.(link)
+  }
+
   const isMobile = typeof window !== 'undefined' && 'ontouchstart' in window
 
   return (
     <div
+      role={selectionMode ? 'button' : undefined}
+      tabIndex={selectionMode ? 0 : undefined}
+      aria-pressed={selectionMode ? selected : undefined}
+      onClickCapture={handleSelectionClick}
+      onKeyDown={handleSelectionKeyDown}
       onContextMenu={(e) => { e.preventDefault(); if (onSelect) onSelect(link) }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchEnd}
-      className={`group glass rounded-2xl p-4 transition-all surface-hover relative ${link.is_pinned ? 'ring-1 ring-accent-500/30' : ''} ${selected ? 'ring-2 ring-accent-500' : ''}`}
+      className={`group glass rounded-2xl p-4 transition-all surface-hover relative ${selectionMode ? 'cursor-pointer' : ''} ${link.is_pinned ? 'ring-1 ring-accent-500/30' : ''} ${selected ? 'ring-2 ring-accent-500' : ''}`}
       style={{ overflow: 'visible' }}
     >
       {/* Pinned indicator */}
@@ -126,8 +144,10 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
       {/* Selection checkbox */}
       {selectionMode && (
         <button
-          onClick={() => onSelect?.(link)}
+          data-selection-checkbox
+          onClick={(e) => { e.stopPropagation(); onSelect?.(link) }}
           className="absolute top-2 left-2 z-10"
+          aria-label={selected ? 'Unselect link' : 'Select link'}
         >
           <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-all ${selected ? 'bg-accent-600 border-accent-600' : 'border-gray-400'}`}>
             {selected && <Check size={12} weight="bold" className="text-white" />}
@@ -207,7 +227,7 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
             <AnimatePresence>
               {menuOpen && (
                 <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }}
-                  className="absolute right-0 top-full mt-1 z-20 glass rounded-xl py-1 min-w-[160px] shadow-xl"
+                  className="link-menu-open absolute right-0 top-full mt-1 z-[70] glass rounded-xl py-1 min-w-[160px] shadow-xl"
                 >
                   <button onClick={() => { onEdit?.(link); setMenuOpen(false) }}
                     className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}

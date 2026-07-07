@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, ArrowLeft, PushPin, CheckSquare, X, Trash, MagnifyingGlass, ListBullets, SquaresFour, FolderPlus, CaretRight, BookOpen, ArrowUpRight, Clipboard } from '@phosphor-icons/react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -59,6 +59,8 @@ export default function Folder({ token }) {
   const [readerLoading, setReaderLoading] = useState(false)
   const [healthChecking, setHealthChecking] = useState(false)
   const [healthResult, setHealthResult] = useState(null)
+  const [draggedLinkId, setDraggedLinkId] = useState(null)
+  const [dragOverLinkId, setDragOverLinkId] = useState(null)
   const touchStartY = useRef(0)
   const toast = useToast()
   const { mode: viewMode, toggle: toggleViewMode } = useViewMode()
@@ -99,6 +101,7 @@ export default function Folder({ token }) {
     let r = [...rawLinks]
     if (activeTag) r = r.filter(l => (l.tags || []).includes(activeTag))
     switch (sortBy) {
+      case 'manual': r.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || new Date(b.created_at) - new Date(a.created_at)); break
       case 'newest': r.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); break
       case 'oldest': r.sort((a, b) => new Date(a.created_at) - new Date(b.created_at)); break
       case 'az': r.sort((a, b) => a.title.localeCompare(b.title)); break
@@ -298,6 +301,61 @@ export default function Folder({ token }) {
     setHealthChecking(false)
   }
 
+  const handleReorderLinks = async (sourceId, targetId, section) => {
+    if (!sourceId || !targetId || sourceId === targetId) return
+    const sectionLinks = section === 'pinned' ? pinnedLinks : normalLinks
+    const from = sectionLinks.findIndex((link) => link.id === sourceId)
+    const to = sectionLinks.findIndex((link) => link.id === targetId)
+    if (from < 0 || to < 0) return
+
+    const next = [...sectionLinks]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+
+    try {
+      await api.reorderLinks(next.map((link, index) => ({
+        id: link.id,
+        sort_order: index,
+        tab_id: link.tab_id ?? undefined,
+      })))
+      setSortBy('manual')
+      refresh()
+      toast.success('Order saved')
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const dragHandlers = (link, section) => ({
+    draggable: !selectionMode,
+    onDragStart: (e) => {
+      if (selectionMode) return
+      e.dataTransfer.effectAllowed = 'move'
+      e.dataTransfer.setData('text/plain', String(link.id))
+      setDraggedLinkId(link.id)
+    },
+    onDragOver: (e) => {
+      if (!draggedLinkId || draggedLinkId === link.id) return
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      setDragOverLinkId(link.id)
+    },
+    onDragLeave: () => {
+      if (dragOverLinkId === link.id) setDragOverLinkId(null)
+    },
+    onDrop: async (e) => {
+      e.preventDefault()
+      const sourceId = Number(e.dataTransfer.getData('text/plain')) || draggedLinkId
+      setDragOverLinkId(null)
+      setDraggedLinkId(null)
+      await handleReorderLinks(sourceId, link.id, section)
+    },
+    onDragEnd: () => {
+      setDraggedLinkId(null)
+      setDragOverLinkId(null)
+    },
+  })
+
   const defaultTabId = isAll ? '' : (id || '')
 
   // Create subfolder
@@ -310,8 +368,13 @@ export default function Folder({ token }) {
 
   const isGrid = viewMode === 'grid'
 
-  const renderLinkList = (link, i) => (
-    <motion.div key={link.id} variants={staggerItem}>
+  const renderLinkList = (section) => (link, i) => (
+    <motion.div
+      key={link.id}
+      variants={staggerItem}
+      className={`link-card-shell rounded-2xl ${draggedLinkId === link.id ? 'opacity-50' : ''} ${dragOverLinkId === link.id ? 'ring-2 ring-accent-500/50' : ''}`}
+      {...dragHandlers(link, section)}
+    >
       <LinkCard
         link={link}
         index={i}
@@ -326,8 +389,13 @@ export default function Folder({ token }) {
     </motion.div>
   )
 
-  const renderLinkGrid = (link, i) => (
-    <motion.div key={link.id} variants={staggerItem}>
+  const renderLinkGrid = (section) => (link, i) => (
+    <motion.div
+      key={link.id}
+      variants={staggerItem}
+      className={`link-card-shell rounded-2xl ${draggedLinkId === link.id ? 'opacity-50' : ''} ${dragOverLinkId === link.id ? 'ring-2 ring-accent-500/50' : ''}`}
+      {...dragHandlers(link, section)}
+    >
       <LinkGridCard
         link={link}
         index={i}
@@ -391,9 +459,6 @@ export default function Folder({ token }) {
               <button onClick={handleCheckHealth} disabled={healthChecking} className="p-2 rounded-lg transition-colors surface-hover" style={{ color: healthChecking ? 'var(--text-muted)' : healthResult?.dead > 0 ? '#ef4444' : 'var(--text-muted)' }} title="Check link health">
                 <span className={`text-[10px] font-bold ${healthChecking ? 'animate-pulse' : ''}`}>{healthChecking ? '...' : healthResult ? `${healthResult.dead}⚡` : '⚡'}</span>
               </button>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="glass text-xs rounded-lg px-2 py-2 border-none outline-none cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-                <option value="newest">Newest</option><option value="oldest">Oldest</option><option value="az">A-Z</option><option value="za">Z-A</option>
-              </select>
               {/* Create subfolder button (not in All Links) */}
               {!isAll && (
                 <button onClick={() => setNewSubOpen(true)} className="p-2 rounded-lg transition-colors surface-hover" style={{ color: 'var(--text-muted)' }} title="Create subfolder">
@@ -416,6 +481,9 @@ export default function Folder({ token }) {
                   </AnimatePresence>
                 </div>
               )}
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="glass text-xs rounded-lg px-2 py-2 border-none outline-none cursor-pointer" style={{ color: 'var(--text-secondary)' }} aria-label="Sort links">
+                <option value="newest">Newest</option><option value="manual">Manual</option><option value="oldest">Oldest</option><option value="az">A-Z</option><option value="za">Z-A</option>
+              </select>
               <button onClick={handlePasteSave} className="h-9 w-9 glass rounded-xl active:scale-95 transition-all flex items-center justify-center surface-hover" style={{ color: 'var(--text-muted)' }} title="Paste URL from clipboard">
                 <Clipboard size={18} />
               </button>
@@ -511,13 +579,13 @@ export default function Folder({ token }) {
                   <PushPin size={10} weight="fill" /> Pinned
                 </div>
                 <motion.div className={`${isGrid ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid grid-cols-1 md:grid-cols-2'} gap-3`} variants={staggerContainer} initial="hidden" animate="show">
-                  {pinnedLinks.map(isGrid ? renderLinkGrid : renderLinkList)}
+                  {pinnedLinks.map(isGrid ? renderLinkGrid('pinned') : renderLinkList('pinned'))}
                 </motion.div>
               </div>
             )}
             {normalLinks.length > 0 && (
               <motion.div className={`${isGrid ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid grid-cols-1 md:grid-cols-2'} gap-3`} variants={staggerContainer} initial="hidden" animate="show">
-                {normalLinks.map(isGrid ? renderLinkGrid : renderLinkList)}
+                {normalLinks.map(isGrid ? renderLinkGrid('normal') : renderLinkList('normal'))}
               </motion.div>
             )}
           </>

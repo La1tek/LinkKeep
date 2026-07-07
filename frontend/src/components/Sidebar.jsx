@@ -6,7 +6,7 @@ import AnimatedCounter from './AnimatedCounter'
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4']
 
-export default function Sidebar({ tabs, activePath, onSelectTab, onSelectAll, onSelectFavorites, onCreateTab, onDeleteTab, onLogout }) {
+export default function Sidebar({ tabs, activePath, adminAvailable = false, onSelectTab, onSelectAll, onSelectFavorites, onCreateTab, onDeleteTab, onLogout }) {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState('#6366f1')
@@ -193,18 +193,20 @@ export default function Sidebar({ tabs, activePath, onSelectTab, onSelectAll, on
           <span>Recommendations</span>
         </motion.button>
 
-        <motion.button
-          layout
-          onClick={() => navigate('/admin')}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover"
-          style={{
-            background: isAdminActive ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-            color: isAdminActive ? '#818cf8' : 'var(--text-tertiary)',
-          }}
-        >
-          <ShieldCheck size={16} />
-          <span>Admin</span>
-        </motion.button>
+        {adminAvailable && (
+          <motion.button
+            layout
+            onClick={() => navigate('/admin')}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover"
+            style={{
+              background: isAdminActive ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+              color: isAdminActive ? '#818cf8' : 'var(--text-tertiary)',
+            }}
+          >
+            <ShieldCheck size={16} />
+            <span>Admin</span>
+          </motion.button>
+        )}
 
         <div className="my-2" style={{ borderTop: '1px solid var(--border-subtle)' }} />
 

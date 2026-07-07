@@ -8,8 +8,9 @@ import { api } from '../lib/api'
 import { useToast } from '../components/Toast'
 import { openConfirm } from '../components/ConfirmModal'
 import { useI18n } from '../lib/i18n'
+import QuickImportModal, { getImportSourceLabel } from '../components/QuickImportModal'
 
-export default function Settings({ user }) {
+export default function Settings({ user, adminAvailable = false }) {
   const navigate = useNavigate()
   const { theme, toggle } = useTheme()
   const { lang, setLanguage, t } = useI18n()
@@ -24,9 +25,10 @@ export default function Settings({ user }) {
   const [sessions, setSessions] = useState([])
   const [importMode, setImportMode] = useState('merge')
   const [importSource, setImportSource] = useState('generic_json')
+  const [importOpen, setImportOpen] = useState(false)
+  const [importBusy, setImportBusy] = useState(false)
   const [snapshots, setSnapshots] = useState([])
   const [jobs, setJobs] = useState([])
-  const [adminAvailable, setAdminAvailable] = useState(false)
   const [tags, setTags] = useState([])
   const [tagDrafts, setTagDrafts] = useState({})
 
@@ -40,7 +42,6 @@ export default function Settings({ user }) {
     api.listTags().then((data) => setTags(data.tags || [])).catch(() => {})
     api.listSnapshots().then((data) => setSnapshots(data.snapshots || [])).catch(() => {})
     api.listJobs().then((data) => setJobs(data.jobs || [])).catch(() => {})
-    api.adminOverview().then(() => setAdminAvailable(true)).catch(() => setAdminAvailable(false))
   }, [])
 
   const handleChangeUsername = async (e) => {
@@ -80,22 +81,29 @@ export default function Settings({ user }) {
       }).catch(() => toast.error('Export failed'))
   }
 
-  const handleImport = (e) => {
-    const file = e.target.files[0]; if (!file) return
-    ;(async () => {
-      try {
-        let result
-        if (importSource === 'generic_json') {
-          const text = await file.text()
-          result = await api.importData(JSON.parse(text), importMode)
-        } else {
-          result = await api.importFile(file, importSource, importMode)
-        }
-        toast.success(`Imported ${result.tabs} tabs, ${result.links} links · merged ${result.merged || 0}, skipped ${result.skipped || 0}`)
-        setTimeout(() => window.location.reload(), 1500)
-      } catch (err) { toast.error('Import failed: ' + err.message) }
-      e.target.value = ''
-    })()
+  const handleImport = async (file) => {
+    if (!file) {
+      toast.error('Choose a file')
+      return false
+    }
+    setImportBusy(true)
+    try {
+      let result
+      if (importSource === 'generic_json') {
+        const text = await file.text()
+        result = await api.importData(JSON.parse(text), importMode)
+      } else {
+        result = await api.importFile(file, importSource, importMode)
+      }
+      toast.success(`Imported ${result.tabs} tabs, ${result.links} links · merged ${result.merged || 0}, skipped ${result.skipped || 0}`)
+      setTimeout(() => window.location.reload(), 1500)
+      return true
+    } catch (err) {
+      toast.error('Import failed: ' + err.message)
+      return false
+    } finally {
+      setImportBusy(false)
+    }
   }
 
   const handleDeleteAccount = async () => {
@@ -276,24 +284,10 @@ export default function Settings({ user }) {
             {adminAvailable && <button onClick={() => navigate('/admin')} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><Key size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('admin')}</span></div><span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>ops</span></button>}
             <button onClick={handleExport} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><Download size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Export as JSON</span></div><span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>.json</span></button>
             <button onClick={handleExportHtml} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors"><div className="flex items-center gap-3"><Download size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Export as HTML Bookmarks</span></div><span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>.html</span></button>
-            <div className="px-4 py-3.5 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3"><Upload size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Import Mode</span></div>
-              <select value={importMode} onChange={(e) => setImportMode(e.target.value)} className="input-base rounded-lg px-2 py-1 text-xs outline-none">
-                <option value="merge">Merge</option>
-                <option value="skip">Skip existing</option>
-                <option value="replace">Replace all</option>
-              </select>
-            </div>
-            <div className="px-4 py-3.5 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3"><Upload size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Import Source</span></div>
-              <select value={importSource} onChange={(e) => setImportSource(e.target.value)} className="input-base rounded-lg px-2 py-1 text-xs outline-none">
-                <option value="generic_json">LinkKeep JSON</option>
-                <option value="bookmarks_html">Browser bookmarks HTML</option>
-                <option value="pocket_json">Pocket JSON</option>
-                <option value="raindrop_csv">Raindrop CSV</option>
-              </select>
-            </div>
-            <label className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors cursor-pointer"><div className="flex items-center gap-3"><Upload size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Import File</span></div><span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>click to select</span><input type="file" accept=".json,.html,.htm,.csv" onChange={handleImport} className="hidden" /></label>
+            <button onClick={() => setImportOpen(true)} className="w-full flex items-center justify-between px-4 py-3.5 surface-hover transition-colors">
+              <div className="flex items-center gap-3"><Upload size={18} style={{ color: 'var(--text-tertiary)' }} /><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Quick Import</span></div>
+              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{getImportSourceLabel(importSource)}</span>
+            </button>
           </div>
         </Section>
 
@@ -398,6 +392,16 @@ export default function Settings({ user }) {
           </div>
         </Section>
       </main>
+      <QuickImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        source={importSource}
+        setSource={setImportSource}
+        mode={importMode}
+        setMode={setImportMode}
+        onImport={handleImport}
+        busy={importBusy}
+      />
     </div>
   )
 }

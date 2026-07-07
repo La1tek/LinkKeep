@@ -65,7 +65,7 @@ test('registers and opens the library', async ({ page }) => {
   await expect(page.getByText('0 links across 0 folders')).toBeVisible()
 })
 
-test('shows sessions, import mode and tag management in settings', async ({ page }) => {
+test('shows sessions, quick import and tag management in settings', async ({ page }) => {
   await mockAuthedApi(page)
   await page.addInitScript(() => {
     window.localStorage.setItem('lk_token', 'test-token')
@@ -76,7 +76,11 @@ test('shows sessions, import mode and tag management in settings', async ({ page
 
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
   await expect(page.getByText('Playwright')).toBeVisible()
-  await expect(page.getByText('Import Mode')).toBeVisible()
+  await expect(page.getByRole('button', { name: /quick import/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Admin$/ })).toHaveCount(0)
+  await page.getByRole('button', { name: /quick import/i }).click()
+  await expect(page.getByRole('heading', { name: 'Quick Import' })).toBeVisible()
+  await expect(page.getByText('Mode', { exact: true })).toBeVisible()
   await expect(page.getByText('Daily')).toBeVisible()
   await expect(page.getByText('docs')).toBeVisible()
 })

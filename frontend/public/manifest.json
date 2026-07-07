@@ -1,7 +1,7 @@
 {
-  "name": "LinkKeep — Premium Link Manager",
+  "name": "LinkKeep — Link Manager",
   "short_name": "LinkKeep",
-  "description": "Your premium link sanctuary",
+  "description": "Save, organize, and search your links",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

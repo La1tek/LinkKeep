@@ -1,4 +1,4 @@
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { Navigate, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from './hooks/useAuth'
@@ -31,6 +31,7 @@ export default function App() {
   const navigate = useNavigate()
   const location = useLocation()
   const toast = useToast()
+  const [adminAvailable, setAdminAvailable] = useState(null)
 
   const { tabs, create: createTab, remove: deleteTab, refresh: refreshTabs } = useTabStore()
 
@@ -43,6 +44,19 @@ export default function App() {
   useEffect(() => {
     if (token) refreshTabs()
   }, [token, refreshTabs])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!token) {
+      setAdminAvailable(null)
+      return () => { cancelled = true }
+    }
+    setAdminAvailable(null)
+    api.adminOverview()
+      .then(() => { if (!cancelled) setAdminAvailable(true) })
+      .catch(() => { if (!cancelled) setAdminAvailable(false) })
+    return () => { cancelled = true }
+  }, [token])
 
   if (location.pathname.startsWith('/share/')) return (
     <>
@@ -96,6 +110,7 @@ export default function App() {
       <Sidebar
         tabs={tabs || []}
         activePath={location.pathname}
+        adminAvailable={adminAvailable === true}
         onSelectTab={(id) => navigate(`/folder/${id}`)}
         onSelectAll={() => navigate('/folder/all')}
         onSelectFavorites={() => navigate('/favorites')}
@@ -122,8 +137,8 @@ export default function App() {
               <Route path="/duplicates" element={<Duplicates token={token} />} />
               <Route path="/shares" element={<Shares />} />
               <Route path="/recommendations" element={<Recommendations />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/settings" element={<Settings user={user} />} />
+              <Route path="/admin" element={adminAvailable === false ? <Navigate to="/settings" replace /> : <Admin />} />
+              <Route path="/settings" element={<Settings user={user} adminAvailable={adminAvailable === true} />} />
             </Routes>
           </motion.div>
         </AnimatePresence>

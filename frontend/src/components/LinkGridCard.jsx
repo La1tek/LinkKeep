@@ -21,13 +21,31 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
     if (longPressTimer.current) clearTimeout(longPressTimer.current)
   }
 
+  const handleSelectionClick = (e) => {
+    if (!selectionMode || e.target.closest('[data-selection-checkbox]')) return
+    e.preventDefault()
+    e.stopPropagation()
+    onSelect?.(link)
+  }
+
+  const handleSelectionKeyDown = (e) => {
+    if (!selectionMode || (e.key !== 'Enter' && e.key !== ' ')) return
+    e.preventDefault()
+    onSelect?.(link)
+  }
+
   return (
     <div
+      role={selectionMode ? 'button' : undefined}
+      tabIndex={selectionMode ? 0 : undefined}
+      aria-pressed={selectionMode ? selected : undefined}
+      onClickCapture={handleSelectionClick}
+      onKeyDown={handleSelectionKeyDown}
       onContextMenu={(e) => { e.preventDefault(); if (onSelect) onSelect(link) }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchEnd}
-      className={`group glass rounded-2xl overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5 relative cursor-pointer ${link.is_pinned ? 'ring-1 ring-accent-500/30' : ''} ${selected ? 'ring-2 ring-accent-500' : ''}`}
+      className={`group glass rounded-2xl overflow-visible transition-all hover:shadow-lg hover:-translate-y-0.5 relative cursor-pointer ${link.is_pinned ? 'ring-1 ring-accent-500/30' : ''} ${selected ? 'ring-2 ring-accent-500' : ''}`}
       onClick={(e) => {
         if (selectionMode) { onSelect?.(link); return }
         if (!e.target.closest('button') && !e.target.closest('a')) {
@@ -37,7 +55,7 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
     >
       {/* Selection checkbox */}
       {selectionMode && (
-        <button onClick={() => onSelect?.(link)} className="absolute top-2 left-2 z-10">
+        <button data-selection-checkbox onClick={(e) => { e.stopPropagation(); onSelect?.(link) }} className="absolute top-2 left-2 z-10" aria-label={selected ? 'Unselect link' : 'Select link'}>
           <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center transition-all ${selected ? 'bg-accent-600 border-accent-600' : 'border-gray-400 bg-white/80'}`}>
             {selected && <Check size={12} weight="bold" className="text-white" />}
           </div>
@@ -45,7 +63,7 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
       )}
 
       {/* OG Image or favicon fallback */}
-      <div className="relative w-full aspect-video overflow-hidden" style={{ background: 'var(--bg-tertiary)' }}>
+      <div className="relative w-full aspect-video overflow-hidden rounded-t-2xl" style={{ background: 'var(--bg-tertiary)' }}>
         {ogImage ? (
           <>
             <img
@@ -130,7 +148,7 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.12 }}
-            className="absolute right-2 top-full mt-1 z-20 glass rounded-xl py-1 min-w-[150px] shadow-xl"
+            className="link-menu-open absolute right-2 top-full mt-1 z-[70] glass rounded-xl py-1 min-w-[150px] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <button onClick={() => { onEdit?.(link); setMenuOpen(false) }}

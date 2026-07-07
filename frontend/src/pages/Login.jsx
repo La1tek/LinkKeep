@@ -29,7 +29,7 @@ export default function Login() {
             <FolderSimple size={28} weight="fill" className="text-white" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>LinkKeep</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>Your premium link sanctuary</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>Save, organize, and search your links</p>
         </div>
 
         <div className="glass rounded-2xl p-6">
