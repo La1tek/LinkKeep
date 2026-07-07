@@ -55,6 +55,23 @@ function clearFolderUnlock(tabId) {
   writeFolderUnlocks(data)
 }
 
+function formatApiError(data) {
+  const detail = data?.detail
+  if (!detail) return 'Request failed'
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) {
+    return detail.map((item) => {
+      if (typeof item === 'string') return item
+      const field = Array.isArray(item.loc) ? item.loc.filter((part) => part !== 'body').join('.') : ''
+      return [field, item.msg].filter(Boolean).join(': ')
+    }).filter(Boolean).join('; ') || 'Request failed'
+  }
+  if (typeof detail === 'object') {
+    return detail.msg || detail.message || JSON.stringify(detail)
+  }
+  return String(detail)
+}
+
 async function request(path, options = {}) {
   const token = getToken()
   const headers = { ...options.headers }
@@ -79,7 +96,7 @@ async function request(path, options = {}) {
   }
 
   const data = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(data?.detail || 'Request failed')
+  if (!res.ok) throw new Error(formatApiError(data))
   return data
 }
 

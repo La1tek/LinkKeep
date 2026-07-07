@@ -189,7 +189,7 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
                 className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2"
                 style={{ color: 'var(--text-secondary)' }}
               >
-                <LockKey size={13} /> Set password
+                <LockKey size={13} /> Set PIN
               </button>
             )}
             <button

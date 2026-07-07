@@ -4,13 +4,13 @@ import { LockKey, LockKeyOpen, X } from '@phosphor-icons/react'
 import { api } from '../lib/api'
 
 export default function FolderLockModal({ open, tab, mode = 'unlock', onClose, onSuccess }) {
-  const [password, setPassword] = useState('')
+  const [pin, setPin] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!open) return
-    setPassword('')
+    setPin('')
     setError('')
     setBusy(false)
   }, [open, tab?.id, mode])
@@ -20,38 +20,48 @@ export default function FolderLockModal({ open, tab, mode = 'unlock', onClose, o
   const copy = {
     lock: {
       title: 'Protect folder',
-      subtitle: `Set a password for "${tab.name}". Locked content will be hidden from tree, lists, search, shares, and direct folder reads until unlocked.`,
-      button: 'Set password',
+      subtitle: `Set a 4-digit PIN for "${tab.name}". Locked content will be hidden from tree, lists, search, shares, and direct folder reads until unlocked.`,
+      button: 'Set PIN',
       icon: <LockKey size={20} weight="fill" />,
     },
     unlock: {
       title: 'Unlock folder',
-      subtitle: `"${tab.name}" is protected. Enter its password to reveal subfolders and links for this session.`,
+      subtitle: `"${tab.name}" is protected. Enter its 4-digit PIN to reveal subfolders and links for this session.`,
       button: 'Unlock',
       icon: <LockKeyOpen size={20} weight="fill" />,
     },
     remove: {
       title: 'Remove protection',
-      subtitle: `Enter the folder password to remove protection from "${tab.name}".`,
+      subtitle: `Enter the folder PIN to remove protection from "${tab.name}".`,
       button: 'Remove lock',
       icon: <LockKeyOpen size={20} weight="fill" />,
     },
   }[mode] || {}
 
+  const validPin = /^\d{4}$/.test(pin)
+
+  const handlePinChange = (value) => {
+    setPin(value.replace(/\D/g, '').slice(0, 4))
+    setError('')
+  }
+
   const submit = async (e) => {
     e.preventDefault()
-    if (!password.trim()) return
+    if (!validPin) {
+      setError('PIN must contain exactly 4 digits')
+      return
+    }
     setBusy(true)
     setError('')
     try {
       let result = null
-      if (mode === 'lock') result = await api.lockTab(tab.id, password)
+      if (mode === 'lock') result = await api.lockTab(tab.id, pin)
       if (mode === 'unlock') {
-        result = await api.unlockTab(tab.id, password)
+        result = await api.unlockTab(tab.id, pin)
         if (result?.unlock_token) api.saveFolderUnlock(tab.id, result.unlock_token, result.expires_at)
       }
       if (mode === 'remove') {
-        await api.unlockTabPermanently(tab.id, password)
+        await api.unlockTabPermanently(tab.id, pin)
         api.clearFolderUnlock(tab.id)
       }
       onSuccess?.(result)
@@ -97,15 +107,18 @@ export default function FolderLockModal({ open, tab, mode = 'unlock', onClose, o
             </div>
 
             <div className="px-5 py-4 space-y-3">
-              <label className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'var(--text-muted)' }}>Folder password</label>
+              <label className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'var(--text-muted)' }}>4-digit folder PIN</label>
               <input
                 autoFocus
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-base w-full rounded-xl px-4 py-3 text-sm outline-none"
-                placeholder="Enter password"
-                autoComplete="current-password"
+                value={pin}
+                onChange={(e) => handlePinChange(e.target.value)}
+                className="input-base w-full rounded-xl px-4 py-3 text-center text-lg font-mono outline-none"
+                placeholder="0000"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
+                autoComplete="one-time-code"
               />
               {error && <p className="text-xs text-red-400" role="alert">{error}</p>}
             </div>
@@ -114,7 +127,7 @@ export default function FolderLockModal({ open, tab, mode = 'unlock', onClose, o
               <button type="button" onClick={onClose} disabled={busy} className="glass px-4 py-2.5 rounded-xl text-sm surface-hover disabled:opacity-40" style={{ color: 'var(--text-secondary)' }}>
                 Cancel
               </button>
-              <button type="submit" disabled={busy || !password.trim()} className="bg-accent-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-accent-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+              <button type="submit" disabled={busy || !validPin} className="bg-accent-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-accent-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                 {busy ? 'Working...' : copy.button}
               </button>
             </div>

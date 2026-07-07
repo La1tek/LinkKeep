@@ -552,7 +552,7 @@ export default function Folder({ token }) {
             </div>
             <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Folder is protected</h2>
             <p className="text-sm mt-2 leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
-              Enter the folder password to reveal its subfolders and saved links.
+              Enter the folder PIN to reveal its subfolders and saved links.
             </p>
             <button
               onClick={() => setFolderLockModal({ tab: currentTab, mode: 'unlock' })}

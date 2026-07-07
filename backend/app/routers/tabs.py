@@ -42,7 +42,7 @@ def _validate_parent(db: Session, user_id: int, tab_id: int | None, parent_id: i
 
 
 class FolderPasswordRequest(BaseModel):
-    password: str = Field(min_length=4, max_length=256)
+    password: str = Field(min_length=4, max_length=4, pattern=r"^\d{4}$")
 
 
 @router.get("", response_model=List[TabOut])
@@ -178,7 +178,7 @@ def unlock_tab(
     if not tab.password_hash:
         return {"status": "unlocked", "tab_id": tab.id, "unlock_token": None, "expires_at": None}
     if not verify_password(data.password, tab.password_hash):
-        raise HTTPException(status_code=403, detail="Incorrect folder password")
+        raise HTTPException(status_code=403, detail="Incorrect folder PIN")
     token, expires_at = issue_folder_unlock(db, user.id, tab.id)
     db.commit()
     return {"status": "unlocked", "tab_id": tab.id, "unlock_token": token, "expires_at": expires_at}
@@ -195,7 +195,7 @@ def unlock_tab_permanently(
     if not tab:
         raise HTTPException(status_code=404, detail="Tab not found")
     if tab.password_hash and not verify_password(data.password, tab.password_hash):
-        raise HTTPException(status_code=403, detail="Incorrect folder password")
+        raise HTTPException(status_code=403, detail="Incorrect folder PIN")
     tab.password_hash = None
     tab.locked_at = None
     db.commit()

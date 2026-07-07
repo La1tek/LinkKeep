@@ -682,7 +682,9 @@ class TestArchiveSearchCollabAndLocks:
         child = client.post("/api/tabs", json={"name": "Child", "parent_id": tab["id"]}, headers=auth_user).json()
         client.post("/api/links", json={"title": "Secret", "url": "https://secret.com", "tab_id": child["id"]}, headers=auth_user)
 
-        lock = client.post(f"/api/tabs/{tab['id']}/lock", json={"password": "folderpass"}, headers=auth_user)
+        invalid_lock = client.post(f"/api/tabs/{tab['id']}/lock", json={"password": "folderpass"}, headers=auth_user)
+        assert invalid_lock.status_code == 422
+        lock = client.post(f"/api/tabs/{tab['id']}/lock", json={"password": "1234"}, headers=auth_user)
         assert lock.status_code == 200
 
         tabs = client.get("/api/tabs", headers=auth_user).json()
@@ -694,9 +696,9 @@ class TestArchiveSearchCollabAndLocks:
         assert blocked.status_code == 403
         assert client.get("/api/links", headers=auth_user).json() == []
 
-        bad_unlock = client.post(f"/api/tabs/{tab['id']}/unlock", json={"password": "wrongpass"}, headers=auth_user)
+        bad_unlock = client.post(f"/api/tabs/{tab['id']}/unlock", json={"password": "0000"}, headers=auth_user)
         assert bad_unlock.status_code == 403
-        unlock = client.post(f"/api/tabs/{tab['id']}/unlock", json={"password": "folderpass"}, headers=auth_user)
+        unlock = client.post(f"/api/tabs/{tab['id']}/unlock", json={"password": "1234"}, headers=auth_user)
         assert unlock.status_code == 200
         headers = {**auth_user, "X-LinkKeep-Folder-Unlocks": unlock.json()["unlock_token"]}
         unlocked_tabs = client.get("/api/tabs", headers=headers).json()
