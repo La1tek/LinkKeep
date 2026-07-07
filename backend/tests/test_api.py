@@ -622,6 +622,110 @@ class TestProductFeatures:
         links = client.get("/api/links", headers=auth_user).json()
         assert links[0]["tags"] == ["code"]
 
+
+class TestArchiveSearchCollabAndLocks:
+    def test_archive_contract_and_search_operators(self, client, auth_user, monkeypatch):
+        from app.models import LinkArchive
+        from app.routers import archives as archive_router
+
+        async def fake_archive(db, link):
+            archive = LinkArchive(
+                link_id=link.id,
+                user_id=link.user_id,
+                status="succeeded",
+                source_url=link.url,
+                html_snapshot="<html>python archive</html>",
+                readable_text="python archive text",
+                screenshot_data_url="data:image/svg+xml;base64,PHN2Zy8+",
+                pdf_data_url="data:application/pdf;base64,JVBERi0xLjQK",
+            )
+            link.content = archive.readable_text
+            db.add(archive)
+            db.commit()
+            db.refresh(archive)
+            return archive
+
+        monkeypatch.setattr(archive_router, "create_link_archive", fake_archive)
+        link = client.post(
+            "/api/links",
+            json={"title": "Archive me", "url": "https://docs.example.com/page", "tags": ["docs"], "note": "keep"},
+            headers=auth_user,
+        ).json()
+
+        archive = client.post(f"/api/links/{link['id']}/archive", headers=auth_user)
+        assert archive.status_code == 201
+        assert archive.json()["status"] == "succeeded"
+        assert archive.json()["has_html"] is True
+        assert archive.json()["has_screenshot"] is True
+        assert archive.json()["has_pdf"] is True
+
+        payload = client.get(f"/api/archives/{archive.json()['id']}", headers=auth_user)
+        assert payload.status_code == 200
+        assert "python archive text" in payload.json()["readable_text"]
+
+        reindex = client.post("/api/search/reindex", headers=auth_user)
+        assert reindex.status_code == 200
+        results = client.get('/api/search/fulltext?q=python tag:docs site:docs.example.com has:note has:archive type:article', headers=auth_user)
+        assert results.status_code == 200
+        assert results.json()["count"] == 1
+
+    def test_saved_search_and_smart_collection(self, client, auth_user):
+        saved = client.post("/api/search/saved", json={"name": "Docs", "query": "tag:docs"}, headers=auth_user)
+        assert saved.status_code == 201
+        smart = client.post("/api/search/smart", json={"name": "Dead links", "query": "is:dead", "color": "#ef4444"}, headers=auth_user)
+        assert smart.status_code == 201
+        assert client.get("/api/search/saved", headers=auth_user).json()["saved_searches"][0]["name"] == "Docs"
+        assert client.get("/api/search/smart", headers=auth_user).json()["smart_collections"][0]["name"] == "Dead links"
+
+    def test_locked_folder_blocks_tree_and_content_until_unlock(self, client, auth_user):
+        tab = client.post("/api/tabs", json={"name": "Private"}, headers=auth_user).json()
+        child = client.post("/api/tabs", json={"name": "Child", "parent_id": tab["id"]}, headers=auth_user).json()
+        client.post("/api/links", json={"title": "Secret", "url": "https://secret.com", "tab_id": child["id"]}, headers=auth_user)
+
+        lock = client.post(f"/api/tabs/{tab['id']}/lock", json={"password": "folderpass"}, headers=auth_user)
+        assert lock.status_code == 200
+
+        tabs = client.get("/api/tabs", headers=auth_user).json()
+        assert [item["name"] for item in tabs] == ["Private"]
+        assert tabs[0]["is_locked"] is True
+        assert tabs[0]["child_count"] == 0
+
+        blocked = client.get(f"/api/links?tab_id={child['id']}", headers=auth_user)
+        assert blocked.status_code == 403
+        assert client.get("/api/links", headers=auth_user).json() == []
+
+        bad_unlock = client.post(f"/api/tabs/{tab['id']}/unlock", json={"password": "wrongpass"}, headers=auth_user)
+        assert bad_unlock.status_code == 403
+        unlock = client.post(f"/api/tabs/{tab['id']}/unlock", json={"password": "folderpass"}, headers=auth_user)
+        assert unlock.status_code == 200
+        headers = {**auth_user, "X-LinkKeep-Folder-Unlocks": unlock.json()["unlock_token"]}
+        unlocked_tabs = client.get("/api/tabs", headers=headers).json()
+        assert {item["name"] for item in unlocked_tabs} == {"Private", "Child"}
+        links = client.get(f"/api/links?tab_id={child['id']}", headers=headers)
+        assert links.status_code == 200
+        assert links.json()[0]["title"] == "Secret"
+
+    def test_share_invites_comments_and_public_profile(self, client, auth_user):
+        client.post("/api/links", json={"title": "Shared", "url": "https://shared.com"}, headers=auth_user)
+        share = client.post("/api/shares", json={"title": "Public collection", "role": "commenter", "public_profile": True}, headers=auth_user).json()
+
+        invite = client.post(f"/api/shares/{share['id']}/invites", json={"email": "friend@example.com", "role": "commenter"}, headers=auth_user)
+        assert invite.status_code == 201
+        assert invite.json()["role"] == "commenter"
+
+        comment = client.post(f"/api/shares/{share['id']}/comments", json={"body": "Looks useful"}, headers=auth_user)
+        assert comment.status_code == 201
+        assert comment.json()["body"] == "Looks useful"
+
+        public = client.get(f"/api/public/shares/{share['token']}")
+        assert public.status_code == 200
+        assert public.json()["role"] == "commenter"
+        assert public.json()["comments"][0]["body"] == "Looks useful"
+
+        profile = client.get("/api/public/profiles/testuser")
+        assert profile.status_code == 200
+        assert profile.json()["shares"][0]["title"] == "Public collection"
+
     def test_admin_overview(self, client, auth_user, monkeypatch):
         monkeypatch.setattr(app_config, "ADMIN_USERNAMES", {"testuser"})
         resp = client.get("/api/admin/overview", headers=auth_user)

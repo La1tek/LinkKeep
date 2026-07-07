@@ -35,6 +35,8 @@ class Tab(Base):
     parent_id = Column(Integer, ForeignKey("tabs.id", ondelete="SET NULL"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    password_hash = Column(String(256), nullable=True)
+    locked_at = Column(DateTime, nullable=True)
 
     owner = relationship("User", back_populates="tabs")
     links = relationship("Link", back_populates="tab", cascade="all, delete-orphan")
@@ -66,6 +68,20 @@ class Link(Base):
 
     owner = relationship("User", back_populates="links")
     tab = relationship("Tab", back_populates="links")
+    archives = relationship("LinkArchive", back_populates="link", cascade="all, delete-orphan", order_by="desc(LinkArchive.created_at)")
+    highlights = relationship("LinkHighlight", back_populates="link", cascade="all, delete-orphan")
+
+    @property
+    def archive_status(self) -> str | None:
+        if not self.archives:
+            return None
+        return self.archives[0].status
+
+    @property
+    def archive_id(self) -> int | None:
+        if not self.archives:
+            return None
+        return self.archives[0].id
 
 
 class SessionToken(Base):
@@ -124,11 +140,15 @@ class SharedCollection(Base):
     title = Column(String(160), nullable=False)
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    role = Column(String(24), default="viewer", nullable=False)
+    public_profile = Column(Boolean, default=False, nullable=False)
     expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     owner = relationship("User", back_populates="shares")
     tab = relationship("Tab")
+    invites = relationship("ShareInvite", back_populates="share", cascade="all, delete-orphan")
+    comments = relationship("ShareComment", back_populates="share", cascade="all, delete-orphan")
 
 
 class LinkSearchIndex(Base):
@@ -141,3 +161,102 @@ class LinkSearchIndex(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     link = relationship("Link")
+
+
+class LinkArchive(Base):
+    __tablename__ = "link_archives"
+
+    id = Column(Integer, primary_key=True, index=True)
+    link_id = Column(Integer, ForeignKey("links.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String(32), default="pending", nullable=False, index=True)
+    error = Column(Text, nullable=True)
+    html_snapshot = Column(Text, nullable=True)
+    readable_text = Column(Text, nullable=True)
+    screenshot_data_url = Column(Text, nullable=True)
+    pdf_data_url = Column(Text, nullable=True)
+    source_url = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    link = relationship("Link", back_populates="archives")
+
+
+class FolderUnlockSession(Base):
+    __tablename__ = "folder_unlock_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    tab_id = Column(Integer, ForeignKey("tabs.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(128), nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    tab = relationship("Tab")
+
+
+class SavedSearch(Base):
+    __tablename__ = "saved_searches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(120), nullable=False)
+    query = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class SmartCollection(Base):
+    __tablename__ = "smart_collections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(120), nullable=False)
+    query = Column(Text, nullable=False)
+    color = Column(String(16), default="#6366f1")
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class ShareInvite(Base):
+    __tablename__ = "share_invites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    share_id = Column(Integer, ForeignKey("shared_collections.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    email = Column(String(256), nullable=True)
+    role = Column(String(24), default="viewer", nullable=False)
+    token = Column(String(96), unique=True, index=True, nullable=False)
+    accepted_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    share = relationship("SharedCollection", back_populates="invites")
+    user = relationship("User")
+
+
+class ShareComment(Base):
+    __tablename__ = "share_comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    share_id = Column(Integer, ForeignKey("shared_collections.id", ondelete="CASCADE"), nullable=False, index=True)
+    link_id = Column(Integer, ForeignKey("links.id", ondelete="SET NULL"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    author_name = Column(String(120), nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    share = relationship("SharedCollection", back_populates="comments")
+    link = relationship("Link")
+    user = relationship("User")
+
+
+class LinkHighlight(Base):
+    __tablename__ = "link_highlights"
+
+    id = Column(Integer, primary_key=True, index=True)
+    link_id = Column(Integer, ForeignKey("links.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    text = Column(Text, nullable=False)
+    note = Column(Text, nullable=True)
+    source_url = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    link = relationship("Link", back_populates="highlights")

@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from urllib.parse import urlparse
 
 from app.database import get_db
-from app.models import User, Link, Tab
+from app.models import User, Link, Tab, LinkHighlight
 from app.schemas import (
     LinkCreate, LinkUpdate, LinkOut,
     BulkLinkAction, BulkResult,
@@ -12,6 +12,12 @@ from app.schemas import (
 from app.routers.auth import _get_current_user
 from app.services.link_service import validate_public_http_url
 from app.services.search_index import upsert_link_index
+from app.services.folder_access import (
+    hidden_locked_descendant_ids,
+    parse_unlock_tokens,
+    require_tab_access,
+    unlocked_tab_ids,
+)
 
 from pydantic import BaseModel
 import time
@@ -31,6 +37,12 @@ class ReorderItem(BaseModel):
 class DuplicateMergeRequest(BaseModel):
     target_id: int
     source_ids: List[int]
+
+
+class HighlightCreate(BaseModel):
+    text: str
+    note: Optional[str] = None
+    source_url: Optional[str] = None
 
 
 router = APIRouter(prefix="/api/links", tags=["links"])
@@ -98,12 +110,26 @@ def list_links(
     global_search: Optional[bool] = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=500),
+    folder_unlocks: str | None = Header(None, alias="X-LinkKeep-Folder-Unlocks"),
     user: User = Depends(_get_current_user),
     db: Session = Depends(get_db),
 ):
+    tokens = parse_unlock_tokens(folder_unlocks)
     query = db.query(Link).filter(Link.user_id == user.id)
     if tab_id is not None:
+        require_tab_access(db, user.id, tab_id, tokens)
         query = query.filter(Link.tab_id == tab_id)
+    else:
+        hidden_ids = hidden_locked_descendant_ids(db, user.id, tokens)
+        unlocked = unlocked_tab_ids(db, user.id, tokens)
+        locked_closed_ids = {
+            tab.id
+            for tab in db.query(Tab.id, Tab.password_hash).filter(Tab.user_id == user.id).all()
+            if tab.password_hash and tab.id not in unlocked
+        }
+        blocked_ids = hidden_ids | locked_closed_ids
+        if blocked_ids:
+            query = query.filter((Link.tab_id.is_(None)) | (~Link.tab_id.in_(blocked_ids)))
     if favorite is not None:
         query = query.filter(Link.is_favorite == favorite)
     if pinned is not None:
@@ -120,8 +146,14 @@ def list_links(
 
 
 @router.post("", response_model=LinkOut, status_code=201)
-def create_link(link: LinkCreate, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+def create_link(
+    link: LinkCreate,
+    folder_unlocks: str | None = Header(None, alias="X-LinkKeep-Folder-Unlocks"),
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
     if link.tab_id is not None:
+        require_tab_access(db, user.id, link.tab_id, parse_unlock_tokens(folder_unlocks))
         tab = db.query(Tab).filter(Tab.id == link.tab_id, Tab.user_id == user.id).first()
         if not tab:
             raise HTTPException(status_code=404, detail="Tab not found")
@@ -149,12 +181,21 @@ def create_link(link: LinkCreate, user: User = Depends(_get_current_user), db: S
 
 
 @router.put("/{link_id}", response_model=LinkOut)
-def update_link(link_id: int, data: LinkUpdate, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+def update_link(
+    link_id: int,
+    data: LinkUpdate,
+    folder_unlocks: str | None = Header(None, alias="X-LinkKeep-Folder-Unlocks"),
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
     link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id).first()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
+    tokens = parse_unlock_tokens(folder_unlocks)
+    require_tab_access(db, user.id, link.tab_id, tokens)
     update_data = data.model_dump(exclude_unset=True)
     if "tab_id" in update_data and update_data["tab_id"] is not None:
+        require_tab_access(db, user.id, update_data["tab_id"], tokens)
         tab = db.query(Tab).filter(Tab.id == update_data["tab_id"], Tab.user_id == user.id).first()
         if not tab:
             raise HTTPException(status_code=404, detail="Tab not found")
@@ -167,19 +208,31 @@ def update_link(link_id: int, data: LinkUpdate, user: User = Depends(_get_curren
 
 
 @router.delete("/{link_id}", status_code=204)
-def delete_link(link_id: int, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+def delete_link(
+    link_id: int,
+    folder_unlocks: str | None = Header(None, alias="X-LinkKeep-Folder-Unlocks"),
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
     link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id).first()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
+    require_tab_access(db, user.id, link.tab_id, parse_unlock_tokens(folder_unlocks))
     db.delete(link)
     db.commit()
 
 
 @router.post("/{link_id}/toggle-favorite", response_model=LinkOut)
-def toggle_favorite(link_id: int, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+def toggle_favorite(
+    link_id: int,
+    folder_unlocks: str | None = Header(None, alias="X-LinkKeep-Folder-Unlocks"),
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
     link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id).first()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
+    require_tab_access(db, user.id, link.tab_id, parse_unlock_tokens(folder_unlocks))
     link.is_favorite = not link.is_favorite
     db.commit()
     db.refresh(link)
@@ -187,10 +240,16 @@ def toggle_favorite(link_id: int, user: User = Depends(_get_current_user), db: S
 
 
 @router.post("/{link_id}/toggle-pin", response_model=LinkOut)
-def toggle_pin(link_id: int, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+def toggle_pin(
+    link_id: int,
+    folder_unlocks: str | None = Header(None, alias="X-LinkKeep-Folder-Unlocks"),
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
     link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id).first()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
+    require_tab_access(db, user.id, link.tab_id, parse_unlock_tokens(folder_unlocks))
     link.is_pinned = not link.is_pinned
     db.commit()
     db.refresh(link)
@@ -198,19 +257,27 @@ def toggle_pin(link_id: int, user: User = Depends(_get_current_user), db: Sessio
 
 
 @router.post("/bulk", response_model=BulkResult)
-def bulk_action(action: BulkLinkAction, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+def bulk_action(
+    action: BulkLinkAction,
+    folder_unlocks: str | None = Header(None, alias="X-LinkKeep-Folder-Unlocks"),
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    tokens = parse_unlock_tokens(folder_unlocks)
     allowed_actions = {"delete", "move", "pin", "unpin", "favorite", "unfavorite"}
     if action.action not in allowed_actions:
         raise HTTPException(status_code=400, detail="Unsupported bulk action")
     if action.action == "move":
         if action.tab_id is None:
             raise HTTPException(status_code=400, detail="tab_id is required for move")
+        require_tab_access(db, user.id, action.tab_id, tokens)
         tab = db.query(Tab).filter(Tab.id == action.tab_id, Tab.user_id == user.id).first()
         if not tab:
             raise HTTPException(status_code=404, detail="Tab not found")
     links = db.query(Link).filter(Link.id.in_(action.link_ids), Link.user_id == user.id).all()
     count = 0
     for link in links:
+        require_tab_access(db, user.id, link.tab_id, tokens)
         if action.action == "delete":
             db.delete(link)
         elif action.action == "move":
@@ -229,7 +296,13 @@ def bulk_action(action: BulkLinkAction, user: User = Depends(_get_current_user),
 
 
 @router.post("/reorder")
-def reorder_links(items: List[ReorderItem], user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+def reorder_links(
+    items: List[ReorderItem],
+    folder_unlocks: str | None = Header(None, alias="X-LinkKeep-Folder-Unlocks"),
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    tokens = parse_unlock_tokens(folder_unlocks)
     requested_tab_ids = {item.tab_id for item in items if item.tab_id is not None}
     if requested_tab_ids:
         owned_tab_ids = {
@@ -242,8 +315,10 @@ def reorder_links(items: List[ReorderItem], user: User = Depends(_get_current_us
     for item in items:
         link = db.query(Link).filter(Link.id == item.id, Link.user_id == user.id).first()
         if link:
+            require_tab_access(db, user.id, link.tab_id, tokens)
             link.sort_order = item.sort_order
             if item.tab_id is not None:
+                require_tab_access(db, user.id, item.tab_id, tokens)
                 link.tab_id = item.tab_id
     db.commit()
     return {"status": "ok"}
@@ -262,6 +337,47 @@ def find_duplicates(user: User = Depends(_get_current_user), db: Session = Depen
         if len(group) > 1
     ]
     return {"duplicates": dups, "count": len(dups)}
+
+
+@router.get("/{link_id}/highlights")
+def list_highlights(link_id: int, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+    return {
+        "highlights": [
+            {
+                "id": item.id,
+                "text": item.text,
+                "note": item.note,
+                "source_url": item.source_url,
+                "created_at": item.created_at,
+            }
+            for item in db.query(LinkHighlight).filter(LinkHighlight.link_id == link.id, LinkHighlight.user_id == user.id).order_by(LinkHighlight.created_at.desc()).all()
+        ]
+    }
+
+
+@router.post("/{link_id}/highlights", status_code=201)
+def create_highlight(link_id: int, data: HighlightCreate, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+    text = data.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Highlight text is required")
+    item = LinkHighlight(
+        link_id=link.id,
+        user_id=user.id,
+        text=text[:10_000],
+        note=(data.note or None),
+        source_url=data.source_url or link.url,
+    )
+    db.add(item)
+    upsert_link_index(db, link)
+    db.commit()
+    db.refresh(item)
+    return {"id": item.id, "text": item.text, "note": item.note, "source_url": item.source_url, "created_at": item.created_at}
 
 
 @router.post("/duplicates/merge")

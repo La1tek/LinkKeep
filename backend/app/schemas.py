@@ -95,6 +95,8 @@ class TabOut(TabBase):
     link_count: int = 0
     child_count: int = 0
     total_link_count: int = 0
+    is_locked: bool = False
+    is_unlocked: bool = False
 
     class Config:
         from_attributes = True
@@ -154,6 +156,8 @@ class LinkOut(LinkBase):
     last_checked: Optional[datetime] = None
     content: Optional[str] = None
     content_fetched: Optional[datetime] = None
+    archive_status: Optional[str] = None
+    archive_id: Optional[int] = None
 
     class Config:
         from_attributes = True

@@ -14,6 +14,10 @@ def build_index_text(link: Link) -> str:
         link.content,
         " ".join(link.tags or []),
     ]
+    for archive in getattr(link, "archives", []) or []:
+        parts.extend([archive.readable_text, archive.html_snapshot])
+    for highlight in getattr(link, "highlights", []) or []:
+        parts.extend([highlight.text, highlight.note])
     return " ".join(part for part in parts if part).lower()
 
 
