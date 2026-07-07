@@ -9,6 +9,7 @@ from app.database import Base, engine
 from app.migrations import run_startup_migrations
 from app.routers import auth, tabs, links, metadata, stats, settings
 from app.config import CORS_ORIGINS, CORS_ORIGIN_REGEX
+from app.version import APP_VERSION
 
 
 @asynccontextmanager
@@ -26,8 +27,6 @@ async def lifespan(app: FastAPI):
         bot_thread.start()
     yield
 
-
-APP_VERSION = "2.4.0"
 
 app = FastAPI(title="LinkKeep API", version=APP_VERSION, lifespan=lifespan)
 

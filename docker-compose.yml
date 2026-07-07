@@ -19,7 +19,9 @@ services:
       retries: 3
 
   frontend:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
     ports:
       - "9091:80"
     depends_on:
