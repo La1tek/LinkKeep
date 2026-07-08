@@ -55,7 +55,7 @@ test('registers and opens the library', async ({ page }) => {
   await mockAuthedApi(page)
   await page.goto('/')
 
-  await expect(page.getByRole('heading', { name: 'LinkKeep' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'LinkAtlas' })).toBeVisible()
   await page.getByRole('button', { name: /register/i }).click()
   await page.getByLabel('Username').fill('demo')
   await page.getByLabel('Password').fill('secret123')

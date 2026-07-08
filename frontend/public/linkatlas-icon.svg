@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">LinkAtlas icon</title>
+  <desc id="desc">A dark rounded-square icon with a glowing constellation map and bookmark route.</desc>
+  <defs>
+    <linearGradient id="bg" x1="82" y1="58" x2="430" y2="468" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#111a35"/>
+      <stop offset="0.42" stop-color="#080d1d"/>
+      <stop offset="1" stop-color="#030611"/>
+    </linearGradient>
+    <radialGradient id="aurora" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(164 332) rotate(-35) scale(258 178)">
+      <stop offset="0" stop-color="#24d4ff" stop-opacity="0.38"/>
+      <stop offset="0.48" stop-color="#7c5cff" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#7c5cff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="nodeGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(248 248) scale(236)">
+      <stop offset="0" stop-color="#7c8cff" stop-opacity="0.26"/>
+      <stop offset="0.55" stop-color="#7c8cff" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#7c8cff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="border" x1="99" y1="71" x2="417" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b8d8ff" stop-opacity="0.84"/>
+      <stop offset="0.48" stop-color="#6d7cff" stop-opacity="0.44"/>
+      <stop offset="1" stop-color="#8a5cff" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="route" x1="136" y1="374" x2="392" y2="114" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#29d7ff"/>
+      <stop offset="0.42" stop-color="#8f76ff"/>
+      <stop offset="1" stop-color="#f4f7ff"/>
+    </linearGradient>
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="nodeBloom" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.45 0 0 0 0 0.56 0 0 0 0 1 0 0 0 0.85 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect x="30" y="30" width="452" height="452" rx="112" fill="url(#bg)"/>
+  <rect x="30" y="30" width="452" height="452" rx="112" fill="url(#aurora)"/>
+  <rect x="30" y="30" width="452" height="452" rx="112" fill="url(#nodeGlow)"/>
+  <rect x="34" y="34" width="444" height="444" rx="108" fill="none" stroke="url(#border)" stroke-width="3"/>
+  <rect x="44" y="44" width="424" height="424" rx="98" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+
+  <g opacity="0.62">
+    <circle cx="256" cy="256" r="164" fill="none" stroke="#8aa2ff" stroke-opacity="0.16" stroke-width="2"/>
+    <circle cx="256" cy="256" r="112" fill="none" stroke="#8aa2ff" stroke-opacity="0.13" stroke-width="2"/>
+    <circle cx="256" cy="256" r="58" fill="none" stroke="#8aa2ff" stroke-opacity="0.12" stroke-width="2"/>
+    <path d="M256 86v340M86 256h340M136 136l240 240M376 136 136 376" stroke="#8aa2ff" stroke-opacity="0.16" stroke-width="2"/>
+    <path d="M144 389c62 31 125 15 167-45 31-45 61-57 100-38" fill="none" stroke="#7c8cff" stroke-opacity="0.36" stroke-width="4" stroke-dasharray="12 16" stroke-linecap="round"/>
+    <path d="M124 116c50 6 97 30 132 68 36 39 84 64 137 72" fill="none" stroke="#7c8cff" stroke-opacity="0.16" stroke-width="2" stroke-dasharray="7 12" stroke-linecap="round"/>
+  </g>
+
+  <g opacity="0.92">
+    <circle cx="120" cy="102" r="2" fill="#dce6ff"/>
+    <circle cx="171" cy="128" r="1.6" fill="#7c8cff"/>
+    <circle cx="220" cy="100" r="1.7" fill="#f4f7ff"/>
+    <circle cx="308" cy="119" r="1.5" fill="#6ee7ff"/>
+    <circle cx="395" cy="165" r="2" fill="#dce6ff"/>
+    <circle cx="116" cy="258" r="1.8" fill="#6ee7ff"/>
+    <circle cx="388" cy="330" r="1.8" fill="#f4f7ff"/>
+    <circle cx="226" cy="402" r="1.5" fill="#9aa8ff"/>
+    <circle cx="321" cy="396" r="1.3" fill="#f4f7ff"/>
+  </g>
+
+  <path d="M142 352 181 387 245 318 319 259 297 205 342 165 389 108" fill="none" stroke="#0b1024" stroke-opacity="0.76" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M204 218 254 236 297 205" fill="none" stroke="#0b1024" stroke-opacity="0.76" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M142 352 181 387 245 318 319 259 297 205 342 165 389 108" fill="none" stroke="url(#route)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow)"/>
+  <path d="M204 218 254 236 297 205" fill="none" stroke="url(#route)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow)"/>
+
+  <g filter="url(#nodeBloom)">
+    <circle cx="142" cy="352" r="18" fill="#6ee7ff"/>
+    <circle cx="181" cy="387" r="16" fill="#40d5ff"/>
+    <circle cx="204" cy="218" r="18" fill="#d8c5ff"/>
+    <circle cx="254" cy="236" r="15" fill="#f4f7ff"/>
+    <circle cx="245" cy="318" r="15" fill="#e8efff"/>
+    <circle cx="297" cy="205" r="14" fill="#f4f7ff"/>
+    <circle cx="319" cy="259" r="15" fill="#f4f7ff"/>
+    <circle cx="342" cy="165" r="14" fill="#f4f7ff"/>
+    <circle cx="389" cy="108" r="15" fill="#f4f7ff"/>
+  </g>
+
+  <g>
+    <path d="M352 318c0-9.4 7.6-17 17-17h45c9.4 0 17 7.6 17 17v101c0 12.7-15.4 19.1-24.4 10.1L392 414.5l-14.6 14.6c-9 9-24.4 2.6-24.4-10.1V318Z" fill="#161b38" fill-opacity="0.9"/>
+    <path d="M369 309h45c5 0 9 4 9 9v101c0 5.6-6.8 8.4-10.7 4.5L392 403.2l-20.3 20.3c-4 4-10.7 1.1-10.7-4.5V318c0-5 4-9 9-9Z" fill="#211a5c" fill-opacity="0.82"/>
+    <path d="M369 309h45c5 0 9 4 9 9v101c0 5.6-6.8 8.4-10.7 4.5L392 403.2l-20.3 20.3c-4 4-10.7 1.1-10.7-4.5V318c0-5 4-9 9-9Z" fill="none" stroke="#8f76ff" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M370 317h43" stroke="#f4f7ff" stroke-opacity="0.64" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>

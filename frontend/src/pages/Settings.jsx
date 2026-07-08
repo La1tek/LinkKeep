@@ -282,7 +282,7 @@ export default function Settings({ user, adminAvailable = false }) {
           <div className="glass rounded-2xl p-4 mt-2">
             <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Offline reading</p>
             <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
-              Installed app caches shell assets and archived reads. Mobile share target can send URLs directly into LinkKeep.
+              Installed app caches shell assets and archived reads. Mobile share target can send URLs directly into LinkAtlas.
             </p>
           </div>
         </Section>

@@ -3,7 +3,7 @@ import { FileArrowUp, Upload, X } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export const IMPORT_SOURCES = [
-  { value: 'generic_json', label: 'LinkKeep JSON', accept: '.json' },
+  { value: 'generic_json', label: 'LinkAtlas JSON', accept: '.json' },
   { value: 'bookmarks_html', label: 'Browser bookmarks HTML', accept: '.html,.htm' },
   { value: 'pocket_json', label: 'Pocket JSON', accept: '.json' },
   { value: 'raindrop_csv', label: 'Raindrop CSV', accept: '.csv' },

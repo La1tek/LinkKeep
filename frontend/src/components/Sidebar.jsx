@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion'
-import { Plus, X, FolderSimple, GearSix, SignOut, Star, Stack, CaretDown, CaretRight, Link as LinkIcon, Sparkle, ShieldCheck, LockKey, ArrowSquareIn } from '@phosphor-icons/react'
+import { Plus, X, GearSix, SignOut, Star, Stack, CaretDown, CaretRight, Link as LinkIcon, Sparkle, ShieldCheck, LockKey, ArrowSquareIn } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AnimatedCounter from './AnimatedCounter'
+import BrandIcon from './BrandIcon'
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4']
 
@@ -214,20 +215,9 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
     >
       <div className="px-5 py-5">
         <button onClick={() => navigate('/')} className="atlas-brand-button group w-full">
-          <div className="atlas-constellation-mark transition-transform group-hover:scale-105" aria-hidden="true">
-            <span className="atlas-star star-a" />
-            <span className="atlas-star star-b" />
-            <span className="atlas-star star-c" />
-            <span className="atlas-star star-d" />
-            <span className="atlas-star star-e" />
-            <span className="atlas-star star-f" />
-            <span className="atlas-line line-a" />
-            <span className="atlas-line line-b" />
-            <span className="atlas-line line-c" />
-            <span className="atlas-line line-d" />
-          </div>
+          <BrandIcon className="atlas-brand-icon transition-transform group-hover:scale-105" />
           <div className="min-w-0 text-left">
-            <span className="block text-base font-semibold transition-colors group-hover:text-accent-400" style={{ color: 'var(--text-primary)' }}>LinkKeep</span>
+            <span className="block text-base font-semibold transition-colors group-hover:text-accent-400" style={{ color: 'var(--text-primary)' }}>LinkAtlas</span>
             <span className="metadata-line block text-[10px]">Your link atlas</span>
           </div>
         </button>
@@ -415,7 +405,7 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
       </div>
 
       <div className="px-5 py-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-        <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>LinkKeep v2.4</p>
+        <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>LinkAtlas v2.4</p>
       </div>
     </aside>
   )

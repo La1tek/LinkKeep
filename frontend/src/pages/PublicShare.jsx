@@ -25,7 +25,7 @@ export default function PublicShare() {
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 mb-3">
             <div className="h-9 w-9 rounded-xl bg-accent-600 text-white flex items-center justify-center"><LinkIcon size={17} weight="bold" /></div>
-            <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>LinkKeep public collection</p>
+            <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>LinkAtlas public collection</p>
           </div>
           <h1 className="text-3xl font-semibold mt-1">{share?.title || 'Loading...'}</h1>
           {share?.description && <p className="text-sm mt-3 max-w-2xl leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>{share.description}</p>}

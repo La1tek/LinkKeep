@@ -8,7 +8,7 @@ export default function Shares() {
   const { tabs } = useTabStore()
   const toast = useToast()
   const [shares, setShares] = useState([])
-  const [title, setTitle] = useState('My LinkKeep Collection')
+  const [title, setTitle] = useState('My LinkAtlas Collection')
   const [tabId, setTabId] = useState('')
   const [role, setRole] = useState('viewer')
   const [publicProfile, setPublicProfile] = useState(false)
@@ -24,7 +24,7 @@ export default function Shares() {
   const create = async () => {
     try {
       await api.createShare({ title, tab_id: tabId ? Number(tabId) : null, role, public_profile: publicProfile })
-      setTitle('My LinkKeep Collection'); setTabId(''); setRole('viewer'); setPublicProfile(false); refresh(); toast.success('Share created')
+      setTitle('My LinkAtlas Collection'); setTabId(''); setRole('viewer'); setPublicProfile(false); refresh(); toast.success('Share created')
     } catch (err) { toast.error(err.message) }
   }
 

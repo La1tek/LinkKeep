@@ -35,9 +35,9 @@ export default function InstallPrompt() {
         <DownloadSimple size={20} className="text-accent-400" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Install LinkKeep</p>
+        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Install LinkAtlas</p>
         <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-          {installed ? 'Installed on this device' : promptEvent ? 'Add LinkKeep as an offline-capable app' : 'Available from your browser install menu'}
+          {installed ? 'Installed on this device' : promptEvent ? 'Add LinkAtlas as an offline-capable app' : 'Available from your browser install menu'}
         </p>
       </div>
       <button onClick={install} disabled={!promptEvent} className="text-xs text-accent-400 px-3 py-1.5 rounded-lg hover:bg-accent-500/10 disabled:opacity-40 disabled:cursor-not-allowed">

@@ -398,6 +398,23 @@
     color: var(--text-primary);
   }
 
+  .atlas-brand-icon {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    border-radius: 14px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 22px rgba(124, 140, 255, 0.22));
+  }
+
+  .atlas-login-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    object-fit: contain;
+    filter: drop-shadow(0 16px 34px rgba(0, 0, 0, 0.24)) drop-shadow(0 0 26px rgba(124, 140, 255, 0.2));
+  }
+
   .atlas-constellation-mark {
     position: relative;
     width: 42px;

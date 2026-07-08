@@ -25,7 +25,7 @@ export default function PublicProfile() {
             <UserCircle size={30} className="text-accent-400" />
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>LinkKeep public profile</p>
+            <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>LinkAtlas public profile</p>
             <h1 className="text-2xl font-semibold mt-1">{profile?.username || username}</h1>
             {profile?.created_at && <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Member since {new Date(profile.created_at).toLocaleDateString()}</p>}
           </div>

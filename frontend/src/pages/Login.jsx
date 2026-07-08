@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { FolderSimple, ArrowRight, Sparkle } from '@phosphor-icons/react'
+import { ArrowRight, Sparkle } from '@phosphor-icons/react'
 import { useAuth } from '../hooks/useAuth'
+import BrandIcon from '../components/BrandIcon'
 
 export default function Login() {
   const { login, register, loading, error } = useAuth()
@@ -31,11 +32,9 @@ export default function Login() {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }} className="relative w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <div className="atlas-logo-mark h-14 w-14 rounded-3xl flex items-center justify-center mb-4">
-            <FolderSimple size={28} weight="fill" className="text-white" />
-          </div>
+          <BrandIcon className="atlas-login-icon mb-4" />
           <div className="metadata-line text-[10px] uppercase mb-1 inline-flex items-center gap-1"><Sparkle size={11} /> quiet observatory</div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>LinkKeep</h1>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>LinkAtlas</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>Save, organize, and search your links</p>
         </div>
 
@@ -63,7 +62,7 @@ export default function Login() {
             {mode === 'login' ? "Don't have an account? Register" : 'Already have an account? Sign in'}
           </button>
         </div>
-        <p className="text-center text-[10px] mt-6 font-mono" style={{ color: 'var(--text-muted)' }}>LinkKeep v2.4</p>
+        <p className="text-center text-[10px] mt-6 font-mono" style={{ color: 'var(--text-muted)' }}>LinkAtlas v2.4</p>
       </motion.div>
     </div>
   )

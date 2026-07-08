@@ -563,7 +563,7 @@ export default function Home({ token }) {
       <section className="dashboard-shell min-h-[calc(100dvh-1rem)] sm:min-h-[calc(100dvh-1.5rem)]">
         <header className="dashboard-topbar">
           <div className="hidden min-w-[150px] md:block">
-            <div className="metadata-line text-[10px] uppercase">LinkKeep atlas</div>
+            <div className="metadata-line text-[10px] uppercase">LinkAtlas</div>
             <h1 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Observatory</h1>
           </div>
 

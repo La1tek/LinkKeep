@@ -1,6 +1,6 @@
 {
-  "name": "LinkKeep — Link Manager",
-  "short_name": "LinkKeep",
+  "name": "LinkAtlas — Link Manager",
+  "short_name": "LinkAtlas",
   "description": "Save, organize, and search your links",
   "start_url": "/",
   "scope": "/",
@@ -20,7 +20,7 @@
       "name": "All links",
       "short_name": "All",
       "url": "/folder/all",
-      "description": "Open the full LinkKeep library"
+      "description": "Open the full LinkAtlas library"
     }
   ],
   "share_target": {
@@ -34,14 +34,8 @@
   },
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='192' height='192' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='42' fill='%236366f1'/%3E%3Cpath d='M64 72h64v48H64z' fill='none' stroke='white' stroke-width='8' stroke-linejoin='round'/%3E%3Cpath d='M80 72V60a4 4 0 014-4h24a4 4 0 014 4v12' fill='none' stroke='white' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='512' height='512' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%236366f1'/%3E%3Cpath d='M170 192h172v128H170z' fill='none' stroke='white' stroke-width='20' stroke-linejoin='round'/%3E%3Cpath d='M210 192v-32a10 10 0 0110-10h64a10 10 0 0110 10v32' fill='none' stroke='white' stroke-width='20' stroke-linecap='round'/%3E%3C/svg%3E",
-      "sizes": "512x512",
+      "src": "/linkatlas-icon.svg",
+      "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
