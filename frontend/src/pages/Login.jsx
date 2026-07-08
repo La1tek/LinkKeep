@@ -62,7 +62,7 @@ export default function Login() {
             {mode === 'login' ? "Don't have an account? Register" : 'Already have an account? Sign in'}
           </button>
         </div>
-        <p className="text-center text-[10px] mt-6 font-mono" style={{ color: 'var(--text-muted)' }}>LinkAtlas v2.5</p>
+        <p className="text-center text-[10px] mt-6 font-mono" style={{ color: 'var(--text-muted)' }}>LinkAtlas v2.6</p>
       </motion.div>
     </div>
   )

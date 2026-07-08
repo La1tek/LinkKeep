@@ -418,7 +418,7 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
       </div>
 
       <div className="px-5 py-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-        <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>LinkAtlas v2.5</p>
+        <p className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>LinkAtlas v2.6</p>
       </div>
     </aside>
   )

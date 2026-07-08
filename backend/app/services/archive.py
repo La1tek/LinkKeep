@@ -85,7 +85,7 @@ async def create_link_archive(db: Session, link: Link) -> LinkArchive:
     try:
         validate_public_http_url(link.url)
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-            response = await client.get(link.url, headers={"User-Agent": "LinkKeep Archiver/2.4"})
+            response = await client.get(link.url, headers={"User-Agent": "LinkKeep Archiver/2.6"})
             response.raise_for_status()
         html = response.text[:1_500_000]
         readable = _extract_readable_text(html)

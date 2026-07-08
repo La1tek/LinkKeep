@@ -1,6 +1,6 @@
-# LinkKeep v2.5
+# LinkKeep v2.6
 
-Self-hosted link manager with folders, tags, favorites, full-text search, public shared collections, backups, browser extension, PWA support, and optional Telegram link intake.
+Self-hosted link manager with folders, tags, favorites, full-text search, public shared collections, backups, trash recovery, detail history, API tokens, browser extension, PWA support, and optional Telegram link intake.
 
 ## Stack
 
@@ -36,6 +36,10 @@ The server build also publishes a downloadable zip at `/LinkKeep-extension.zip`.
 - Public shared collections at `/share/{token}`
 - Full-text search index with manual rebuild and background job support
 - Backup snapshots with restore modes and retention
+- Soft-delete trash with restore/permanent-delete flows
+- Link detail panel with notes, reminders, priority, attachments, highlights, archive timeline, and change history
+- Revocable API tokens for extension and automation access
+- Import/restore previews before mutating stored links
 - Imports from LinkKeep JSON, browser bookmarks HTML, Pocket JSON, and Raindrop CSV
 - Recommendations for autotags, stale links, and dead links
 - Admin overview when `ADMIN_USERNAMES` contains the current username

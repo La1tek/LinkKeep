@@ -1,4 +1,4 @@
-// LinkKeep Extension v2.5 — background service worker with bidirectional bookmark sync
+// LinkKeep Extension v2.6 — background service worker with bidirectional bookmark sync
 
 const SYNC_FOLDER = 'LinkKeep';
 const SYNC_ALARM_NAME = 'linkkeep-sync';

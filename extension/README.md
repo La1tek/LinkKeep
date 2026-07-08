@@ -1,4 +1,4 @@
-# LinkKeep Browser Extension v2.5
+# LinkKeep Browser Extension v2.6
 
 A Chrome extension for quick link saving and bookmark sync with your self-hosted LinkKeep instance.
 
@@ -11,6 +11,7 @@ A Chrome extension for quick link saving and bookmark sync with your self-hosted
 - ⌨️ **Keyboard shortcuts** — Ctrl+Enter to save, Esc to close
 - ⚙️ **Settings page** — configure behavior, disconnect
 - 🔄 **Bookmark sync** — optional two-way sync with a dedicated `LinkKeep` bookmarks folder
+- 🔑 **API token login** — paste an `lkat_...` token instead of a password for revocable extension access
 
 ## Installation (Chrome / Edge / Brave)
 
@@ -23,7 +24,7 @@ A Chrome extension for quick link saving and bookmark sync with your self-hosted
 
 1. Click the LinkKeep icon in your toolbar
 2. Enter your LinkKeep server URL (e.g. `http://your-server:9091`)
-3. Enter your username and password
+3. Enter your username and password, or paste an `lkat_...` API token into the username field and leave password empty
 4. Click **Connect**
 5. You're ready to save links!
 
