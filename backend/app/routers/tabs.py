@@ -62,7 +62,7 @@ def list_tabs(
         by_parent.setdefault(t.parent_id, []).append(t.id)
 
     def total_links(tab_id: int) -> int:
-        total = db.query(Link).filter(Link.user_id == user.id, Link.tab_id == tab_id).count()
+        total = db.query(Link).filter(Link.user_id == user.id, Link.tab_id == tab_id, Link.deleted_at.is_(None)).count()
         for child_id in by_parent.get(tab_id, []):
             total += total_links(child_id)
         return total
@@ -75,7 +75,7 @@ def list_tabs(
         out = TabOut.model_validate(t)
         out.is_locked = bool(t.password_hash)
         out.is_unlocked = bool(t.password_hash and t.id in unlocked)
-        out.link_count = 0 if locked_closed else db.query(Link).filter(Link.user_id == user.id, Link.tab_id == t.id).count()
+        out.link_count = 0 if locked_closed else db.query(Link).filter(Link.user_id == user.id, Link.tab_id == t.id, Link.deleted_at.is_(None)).count()
         out.child_count = 0 if locked_closed else len(by_parent.get(t.id, []))
         out.total_link_count = 0 if locked_closed else total_links(t.id)
         result.append(out)
@@ -123,7 +123,7 @@ def update_tab(
     db.commit()
     db.refresh(tab)
     out = TabOut.model_validate(tab)
-    out.link_count = db.query(Link).filter(Link.user_id == user.id, Link.tab_id == tab.id).count()
+    out.link_count = db.query(Link).filter(Link.user_id == user.id, Link.tab_id == tab.id, Link.deleted_at.is_(None)).count()
     return out
 
 

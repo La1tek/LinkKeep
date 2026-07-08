@@ -126,7 +126,7 @@ def create_comment(share_id: int, data: ShareCommentCreate, user: User = Depends
     if not share:
         raise HTTPException(status_code=404, detail="Share not found")
     if data.link_id is not None:
-        link = db.query(Link).filter(Link.id == data.link_id, Link.user_id == user.id).first()
+        link = db.query(Link).filter(Link.id == data.link_id, Link.user_id == user.id, Link.deleted_at.is_(None)).first()
         if not link:
             raise HTTPException(status_code=404, detail="Link not found")
     comment = ShareComment(share_id=share.id, link_id=data.link_id, user_id=user.id, author_name=user.username, body=data.body.strip())
@@ -144,7 +144,7 @@ def get_public_share(token: str, db: Session = Depends(get_db)):
     if share.expires_at and share.expires_at.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc):
         raise HTTPException(status_code=404, detail="Share expired")
 
-    query = db.query(Link).filter(Link.user_id == share.user_id)
+    query = db.query(Link).filter(Link.user_id == share.user_id, Link.deleted_at.is_(None))
     if share.tab_id is not None:
         tab = db.query(Tab).filter(Tab.id == share.tab_id, Tab.user_id == share.user_id).first()
         if tab and tab.password_hash:

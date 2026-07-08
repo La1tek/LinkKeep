@@ -54,9 +54,9 @@ def fulltext_search(
     if tag:
         filters.tags.append(tag)
     if favorite is not None:
-        base_query = db.query(Link).filter(Link.user_id == user.id, Link.is_favorite == favorite)
+        base_query = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None), Link.is_favorite == favorite)
     else:
-        base_query = db.query(Link).filter(Link.user_id == user.id)
+        base_query = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None))
     if dead is not None:
         filters.is_dead = dead
 
@@ -130,7 +130,7 @@ def list_smart_collections(
     result = []
     for row in rows:
         filters = parse_search_query(row.query)
-        links = apply_python_filters(apply_db_filters(db.query(Link).filter(Link.user_id == user.id), filters).limit(500).all(), filters)
+        links = apply_python_filters(apply_db_filters(db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)), filters).limit(500).all(), filters)
         result.append({"id": row.id, "name": row.name, "query": row.query, "color": row.color, "count": len(_visible_links(links, blocked_ids)), "created_at": row.created_at})
     return {"smart_collections": result}
 

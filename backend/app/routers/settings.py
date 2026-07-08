@@ -1,6 +1,8 @@
 import csv
+import hashlib
 import io
 import json
+import base64
 
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -13,8 +15,8 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from app.database import get_db
-from app.models import BackupSnapshot, User, Tab, Link
-from app.schemas import LinkOut, TabOut, UserOut
+from app.models import ApiToken, AppNotification, BackupSnapshot, User, Tab, Link
+from app.schemas import ApiTokenCreate, ApiTokenCreated, ApiTokenOut, ImportPreviewOut, LinkOut, NotificationOut, TabOut, UserOut
 from app.auth import get_password_hash, verify_password
 from app.routers.auth import _get_current_user
 from app import config
@@ -55,8 +57,25 @@ def _normalize_url(url: str) -> str:
         hostname = hostname[4:]
     port = f":{parsed.port}" if parsed.port else ""
     path = parsed.path.rstrip("/") or "/"
-    query = f"?{parsed.query}" if parsed.query else ""
-    return f"{parsed.scheme}://{hostname}{port}{path}{query}".lower()
+    ignored = {"fbclid", "gclid", "dclid", "yclid", "mc_cid", "mc_eid", "igshid", "ref"}
+    query_items = []
+    for part in parsed.query.split("&"):
+        if not part:
+            continue
+        key = part.split("=", 1)[0].lower()
+        if key.startswith("utm_") or key in ignored:
+            continue
+        query_items.append(part)
+    query = f"?{'&'.join(query_items)}" if query_items else ""
+    return f"{parsed.scheme.lower()}://{hostname}{port}{path}{query}".lower()
+
+
+def _new_api_token() -> str:
+    return f"lkat_{secrets.token_urlsafe(32)}"
+
+
+def _hash_api_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def _clean_tags(tags) -> list[str]:
@@ -93,12 +112,26 @@ def _merge_link(existing: Link, link_data: dict, tab_id: int | None) -> None:
     existing.tags = _clean_tags([*(existing.tags or []), *link_data.get("tags", [])])
     existing.is_favorite = bool(existing.is_favorite or link_data.get("is_favorite", False))
     existing.is_pinned = bool(existing.is_pinned or link_data.get("is_pinned", False))
+    existing.is_read = bool(existing.is_read or link_data.get("is_read", False))
+    existing.priority = link_data.get("priority") or existing.priority or "normal"
+    existing.reminder_at = _parse_datetime(link_data.get("reminder_at")) or existing.reminder_at
     existing.note = _merge_notes(existing.note, link_data.get("note"))
+
+
+def _parse_datetime(value) -> datetime | None:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 def _export_user_data(user: User, db: Session) -> dict:
     tabs = db.query(Tab).filter(Tab.user_id == user.id).all()
-    links = db.query(Link).filter(Link.user_id == user.id).all()
+    links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).all()
     return {
         "version": APP_VERSION,
         "exported_at": datetime.now(timezone.utc).isoformat(),
@@ -112,6 +145,7 @@ def _export_user_data(user: User, db: Session) -> dict:
                 "id": l.id, "title": l.title, "url": l.url, "description": l.description,
                 "favicon": l.favicon, "tab_id": l.tab_id, "tags": l.tags or [],
                 "is_favorite": l.is_favorite, "is_pinned": l.is_pinned, "note": l.note,
+                "is_read": l.is_read, "priority": l.priority, "reminder_at": l.reminder_at.isoformat() if l.reminder_at else None,
                 "image": l.image, "sort_order": l.sort_order,
                 "created_at": l.created_at.isoformat() if l.created_at else None,
             }
@@ -199,6 +233,7 @@ def _import_user_data(data: ImportData, user: User, db: Session, mode: ImportMod
         new_link = Link(
             title=str(link_data.get("title") or "Untitled")[:256],
             url=url,
+            canonical_url=normalized_url,
             description=link_data.get("description"),
             favicon=link_data.get("favicon"),
             image=link_data.get("image"),
@@ -206,6 +241,9 @@ def _import_user_data(data: ImportData, user: User, db: Session, mode: ImportMod
             tags=_clean_tags(link_data.get("tags", [])),
             is_favorite=link_data.get("is_favorite", False),
             is_pinned=link_data.get("is_pinned", False),
+            is_read=link_data.get("is_read", False),
+            priority=link_data.get("priority") or "normal",
+            reminder_at=_parse_datetime(link_data.get("reminder_at")),
             note=link_data.get("note"),
             sort_order=link_data.get("sort_order", 0),
             user_id=user.id,
@@ -217,6 +255,45 @@ def _import_user_data(data: ImportData, user: User, db: Session, mode: ImportMod
 
     db.commit()
     return {"message": "Import complete", **result}
+
+
+def _preview_user_data(data: ImportData, user: User, db: Session, mode: ImportMode) -> ImportPreviewOut:
+    current_tabs = db.query(Tab).filter(Tab.user_id == user.id).all()
+    current_links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).all()
+    tab_names = {tab.name for tab in current_tabs}
+    link_urls = {}
+    for link in current_links:
+        try:
+            link_urls[link.canonical_url or _normalize_url(link.url)] = link
+        except ValueError:
+            continue
+
+    preview = ImportPreviewOut(
+        mode=mode,
+        replace_deletes_links=len(current_links) if mode == "replace" else 0,
+        replace_deletes_tabs=len(current_tabs) if mode == "replace" else 0,
+    )
+    for tab_data in data.tabs:
+        name = str(tab_data.get("name") or "Imported")[:128]
+        if mode != "replace" and name in tab_names:
+            preview.tabs_existing += 1
+        else:
+            preview.tabs_new += 1
+
+    for link_data in data.links:
+        url = str(link_data.get("url", "")).strip()
+        try:
+            normalized = _normalize_url(url)
+        except ValueError:
+            preview.links_invalid += 1
+            continue
+        if mode != "replace" and normalized in link_urls:
+            preview.links_existing += 1
+        else:
+            preview.links_new += 1
+        if len(preview.sample_links) < 5:
+            preview.sample_links.append({"title": str(link_data.get("title") or "Untitled")[:256], "url": url})
+    return preview
 
 
 def _links_from_bookmarks_html(raw: str) -> list[dict]:
@@ -333,6 +410,79 @@ def create_bot_token(user: User = Depends(_get_current_user), db: Session = Depe
     return {"token": token, "command": f"/start {token}"}
 
 
+@router.get("/api-tokens", response_model=list[ApiTokenOut])
+def list_api_tokens(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    return (
+        db.query(ApiToken)
+        .filter(ApiToken.user_id == user.id)
+        .order_by(ApiToken.created_at.desc())
+        .all()
+    )
+
+
+@router.post("/api-tokens", response_model=ApiTokenCreated, status_code=201)
+def create_api_token(data: ApiTokenCreate, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    raw_token = _new_api_token()
+    row = ApiToken(
+        user_id=user.id,
+        name=data.name,
+        token_hash=_hash_api_token(raw_token),
+        token_prefix=raw_token[:12],
+        scopes=data.scopes,
+    )
+    db.add(row)
+    db.add(AppNotification(user_id=user.id, type="api_token", title="API token created", body=data.name, payload={"token_name": data.name}))
+    db.commit()
+    db.refresh(row)
+    return {
+        "id": row.id,
+        "name": row.name,
+        "token_prefix": row.token_prefix,
+        "scopes": row.scopes or [],
+        "created_at": row.created_at,
+        "last_used_at": row.last_used_at,
+        "revoked_at": row.revoked_at,
+        "token": raw_token,
+    }
+
+
+@router.delete("/api-tokens/{token_id}", status_code=204)
+def revoke_api_token(token_id: int, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    row = db.query(ApiToken).filter(ApiToken.id == token_id, ApiToken.user_id == user.id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="API token not found")
+    row.revoked_at = datetime.now(timezone.utc)
+    db.commit()
+
+
+@router.get("/notifications", response_model=list[NotificationOut])
+def list_notifications(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    return (
+        db.query(AppNotification)
+        .filter(AppNotification.user_id == user.id)
+        .order_by(AppNotification.created_at.desc())
+        .limit(100)
+        .all()
+    )
+
+
+@router.post("/notifications/{notification_id}/read", response_model=NotificationOut)
+def mark_notification_read(notification_id: int, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    row = db.query(AppNotification).filter(AppNotification.id == notification_id, AppNotification.user_id == user.id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    row.read_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@router.delete("/notifications", status_code=204)
+def clear_notifications(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    db.query(AppNotification).filter(AppNotification.user_id == user.id).delete()
+    db.commit()
+
+
 @router.get("/export")
 def export_data(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
     return _export_user_data(user, db)
@@ -346,6 +496,16 @@ def import_data(
     db: Session = Depends(get_db),
 ):
     return _import_user_data(data, user, db, data.mode or mode)
+
+
+@router.post("/import/preview", response_model=ImportPreviewOut)
+def preview_import_data(
+    data: ImportData,
+    mode: ImportMode = "merge",
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    return _preview_user_data(data, user, db, data.mode or mode)
 
 
 @router.get("/backup")
@@ -363,6 +523,16 @@ def restore_data(
     return _import_user_data(data, user, db, data.mode or mode)
 
 
+@router.post("/restore/preview", response_model=ImportPreviewOut)
+def preview_restore_data(
+    data: ImportData,
+    mode: ImportMode = "replace",
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    return _preview_user_data(data, user, db, data.mode or mode)
+
+
 @router.post("/import-file")
 async def import_file(
     source: ImportSource,
@@ -377,6 +547,22 @@ async def import_file(
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Cannot parse import file: {exc}") from exc
     return _import_user_data(data, user, db, data.mode or mode)
+
+
+@router.post("/import-file/preview", response_model=ImportPreviewOut)
+async def preview_import_file(
+    source: ImportSource,
+    mode: ImportMode = "merge",
+    file: UploadFile = File(...),
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    raw = (await file.read()).decode("utf-8", errors="replace")
+    try:
+        data = _parse_import_file(source, raw)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Cannot parse import file: {exc}") from exc
+    return _preview_user_data(data, user, db, data.mode or mode)
 
 
 @router.get("/snapshots")
@@ -427,6 +613,19 @@ def restore_snapshot(
     return _import_user_data(ImportData(**snapshot.data), user, db, mode)
 
 
+@router.get("/snapshots/{snapshot_id}/preview", response_model=ImportPreviewOut)
+def preview_snapshot_restore(
+    snapshot_id: int,
+    mode: ImportMode = "replace",
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    snapshot = db.query(BackupSnapshot).filter(BackupSnapshot.id == snapshot_id, BackupSnapshot.user_id == user.id).first()
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return _preview_user_data(ImportData(**snapshot.data), user, db, mode)
+
+
 @router.delete("/snapshots/{snapshot_id}", status_code=204)
 def delete_snapshot(snapshot_id: int, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
     snapshot = db.query(BackupSnapshot).filter(BackupSnapshot.id == snapshot_id, BackupSnapshot.user_id == user.id).first()
@@ -447,7 +646,7 @@ def export_html(user: User = Depends(_get_current_user), db: Session = Depends(g
     from fastapi.responses import Response
 
     tabs = db.query(Tab).filter(Tab.user_id == user.id).all()
-    links = db.query(Link).filter(Link.user_id == user.id).all()
+    links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).all()
 
     html_parts = [
         "<!DOCTYPE html>",

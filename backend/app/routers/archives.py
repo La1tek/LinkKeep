@@ -44,7 +44,7 @@ async def archive_link(
     user: User = Depends(_get_current_user),
     db: Session = Depends(get_db),
 ):
-    link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id).first()
+    link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id, Link.deleted_at.is_(None)).first()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
     require_tab_access(db, user.id, link.tab_id, parse_unlock_tokens(folder_unlocks))
@@ -59,7 +59,7 @@ def list_link_archives(
     user: User = Depends(_get_current_user),
     db: Session = Depends(get_db),
 ):
-    link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id).first()
+    link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id, Link.deleted_at.is_(None)).first()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
     require_tab_access(db, user.id, link.tab_id, parse_unlock_tokens(folder_unlocks))

@@ -364,6 +364,82 @@ class TestBulk:
         pinned = client.get("/api/links?pinned=true", headers=auth_user)
         assert len(pinned.json()) == 2
 
+    def test_bulk_tags_read_and_priority(self, client, auth_user):
+        link = client.post("/api/links", json={"title": "L", "url": "https://1.com"}, headers=auth_user).json()
+        tag = client.post("/api/links/bulk", json={"link_ids": [link["id"]], "action": "add_tags", "tags": ["readlater"]}, headers=auth_user)
+        assert tag.status_code == 200
+        read = client.post("/api/links/bulk", json={"link_ids": [link["id"]], "action": "read"}, headers=auth_user)
+        assert read.json()["affected"] == 1
+        priority = client.post("/api/links/bulk", json={"link_ids": [link["id"]], "action": "set_priority", "priority": "high"}, headers=auth_user)
+        assert priority.status_code == 200
+        links = client.get("/api/links?read=true&priority=high", headers=auth_user).json()
+        assert len(links) == 1
+        assert links[0]["is_read"] is True
+        assert "readlater" in links[0]["tags"]
+        assert links[0]["priority"] == "high"
+
+
+class TestProductWorkflows:
+    def test_soft_delete_restore_and_destroy(self, client, auth_user):
+        link = client.post("/api/links", json={"title": "Trash me", "url": "https://trash.example.com"}, headers=auth_user).json()
+        deleted = client.delete(f"/api/links/{link['id']}", headers=auth_user)
+        assert deleted.status_code == 204
+        assert client.get("/api/links", headers=auth_user).json() == []
+
+        trash = client.get("/api/links/trash", headers=auth_user)
+        assert trash.status_code == 200
+        assert trash.json()[0]["title"] == "Trash me"
+        assert trash.json()[0]["deleted_at"] is not None
+
+        restored = client.post(f"/api/links/{link['id']}/restore", headers=auth_user)
+        assert restored.status_code == 200
+        assert restored.json()["deleted_at"] is None
+        assert len(client.get("/api/links", headers=auth_user).json()) == 1
+
+        client.delete(f"/api/links/{link['id']}", headers=auth_user)
+        destroyed = client.delete(f"/api/links/{link['id']}/destroy", headers=auth_user)
+        assert destroyed.status_code == 204
+        assert client.get("/api/links/trash", headers=auth_user).json() == []
+
+    def test_link_detail_history_and_attachment(self, client, auth_user):
+        link = client.post("/api/links", json={"title": "Detail", "url": "https://detail.example.com"}, headers=auth_user).json()
+        client.put(f"/api/links/{link['id']}", json={"note": "Important"}, headers=auth_user)
+        attachment = client.post(
+            f"/api/links/{link['id']}/attachments",
+            json={"filename": "note.txt", "content_type": "text/plain", "data_url": "data:text/plain;base64,SGVsbG8="},
+            headers=auth_user,
+        )
+        assert attachment.status_code == 201
+
+        detail = client.get(f"/api/links/{link['id']}", headers=auth_user)
+        assert detail.status_code == 200
+        data = detail.json()
+        assert data["link"]["note"] == "Important"
+        assert [item["action"] for item in data["history"]][:2] == ["attachment_added", "updated"]
+        assert data["attachments"][0]["filename"] == "note.txt"
+
+    def test_import_preview_and_api_token_auth(self, client, auth_user):
+        client.post("/api/links", json={"title": "Existing", "url": "https://example.com/?utm_source=x"}, headers=auth_user)
+        payload = {
+            "links": [
+                {"title": "Duplicate", "url": "https://www.example.com/"},
+                {"title": "New", "url": "https://new.example.com"},
+                {"title": "Bad", "url": "ftp://bad.example.com"},
+            ]
+        }
+        preview = client.post("/api/settings/import/preview?mode=merge", json=payload, headers=auth_user)
+        assert preview.status_code == 200
+        assert preview.json()["links_existing"] == 1
+        assert preview.json()["links_new"] == 1
+        assert preview.json()["links_invalid"] == 1
+
+        token_resp = client.post("/api/settings/api-tokens", json={"name": "Extension"}, headers=auth_user)
+        assert token_resp.status_code == 201
+        token = token_resp.json()["token"]
+        me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert me.status_code == 200
+        assert me.json()["username"] == "testuser"
+
 
 # ── Ungrouped Filter Tests (v2.2) ───────────────────
 

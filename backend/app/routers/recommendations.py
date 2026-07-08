@@ -44,7 +44,7 @@ def _suggest_tags(link: Link) -> list[str]:
 
 @router.get("")
 def get_recommendations(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
-    links = db.query(Link).filter(Link.user_id == user.id).order_by(Link.updated_at.desc()).limit(200).all()
+    links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).order_by(Link.updated_at.desc()).limit(200).all()
     stale_cutoff = datetime.now(timezone.utc) - timedelta(days=90)
     autotags = []
     stale = []
@@ -64,7 +64,7 @@ def get_recommendations(user: User = Depends(_get_current_user), db: Session = D
 @router.post("/apply-tags")
 def apply_recommended_tags(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
     updated = 0
-    links = db.query(Link).filter(Link.user_id == user.id).all()
+    links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).all()
     for link in links:
         suggested = _suggest_tags(link)
         if not suggested:

@@ -23,7 +23,7 @@ def _clean_tag(value: str) -> str:
 @router.get("")
 def list_tags(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
     counts: dict[str, int] = {}
-    links = db.query(Link.tags).filter(Link.user_id == user.id).all()
+    links = db.query(Link.tags).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).all()
     for row in links:
         for tag in row.tags or []:
             counts[tag] = counts.get(tag, 0) + 1
@@ -46,7 +46,7 @@ def rename_tag(
     new_name = _clean_tag(data.new_name)
     updated = 0
 
-    links = db.query(Link).filter(Link.user_id == user.id).all()
+    links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).all()
     for link in links:
         tags = link.tags or []
         if old_name not in tags:
@@ -73,7 +73,7 @@ def delete_tag(tag_name: str, user: User = Depends(_get_current_user), db: Sessi
     name = _clean_tag(tag_name)
     updated = 0
 
-    links = db.query(Link).filter(Link.user_id == user.id).all()
+    links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).all()
     for link in links:
         tags = link.tags or []
         if name not in tags:

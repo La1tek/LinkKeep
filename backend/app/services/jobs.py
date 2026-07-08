@@ -97,7 +97,7 @@ def run_job(db: Session, job: Job) -> dict:
 
     if job.type == "refresh_metadata":
         limit = int(job.payload.get("limit", 25))
-        links = db.query(Link).filter(Link.user_id == user.id).order_by(Link.updated_at.desc()).limit(limit).all()
+        links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).order_by(Link.updated_at.desc()).limit(limit).all()
         refreshed = 0
         for link in links:
             metadata = asyncio.run(fetch_metadata(link.url))
@@ -111,7 +111,7 @@ def run_job(db: Session, job: Job) -> dict:
 
     if job.type == "check_link_health":
         limit = int(job.payload.get("limit", 50))
-        links = db.query(Link).filter(Link.user_id == user.id).order_by(Link.id).limit(limit).all()
+        links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).order_by(Link.id).limit(limit).all()
         checked = dead = alive = 0
         with httpx.Client(timeout=10, follow_redirects=True, trust_env=False) as client:
             for link in links:

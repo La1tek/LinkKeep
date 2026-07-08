@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app import config
 from app.database import get_db
-from app.models import BackupSnapshot, Job, Link, SessionToken, Tab, User
+from app.models import ApiToken, AppNotification, BackupSnapshot, Job, Link, LinkArchive, SessionToken, Tab, User
 from app.routers.auth import _get_current_user
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -20,14 +20,38 @@ def overview(admin: User = Depends(_require_admin), db: Session = Depends(get_db
     return {
         "users": db.query(User).count(),
         "links": db.query(Link).count(),
+        "active_links": db.query(Link).filter(Link.deleted_at.is_(None)).count(),
+        "trashed_links": db.query(Link).filter(Link.deleted_at.isnot(None)).count(),
         "tabs": db.query(Tab).count(),
         "jobs": {
             "queued": db.query(Job).filter(Job.status == "queued").count(),
             "running": db.query(Job).filter(Job.status == "running").count(),
             "failed": db.query(Job).filter(Job.status == "failed").count(),
         },
+        "archives": {
+            "succeeded": db.query(LinkArchive).filter(LinkArchive.status == "succeeded").count(),
+            "failed": db.query(LinkArchive).filter(LinkArchive.status == "failed").count(),
+            "pending": db.query(LinkArchive).filter(LinkArchive.status == "pending").count(),
+        },
         "snapshots": db.query(BackupSnapshot).count(),
         "sessions": db.query(SessionToken).count(),
+        "api_tokens": db.query(ApiToken).filter(ApiToken.revoked_at.is_(None)).count(),
+        "notifications": db.query(AppNotification).filter(AppNotification.read_at.is_(None)).count(),
+    }
+
+
+@router.get("/health")
+def health(admin: User = Depends(_require_admin), db: Session = Depends(get_db)):
+    failed_jobs = db.query(Job).filter(Job.status == "failed").count()
+    failed_archives = db.query(LinkArchive).filter(LinkArchive.status == "failed").count()
+    queued_jobs = db.query(Job).filter(Job.status == "queued").count()
+    return {
+        "ok": failed_jobs == 0,
+        "failed_jobs": failed_jobs,
+        "queued_jobs": queued_jobs,
+        "failed_archives": failed_archives,
+        "trash": db.query(Link).filter(Link.deleted_at.isnot(None)).count(),
+        "users": db.query(User).count(),
     }
 
 
@@ -41,6 +65,7 @@ def list_users(admin: User = Depends(_require_admin), db: Session = Depends(get_
                 "username": user.username,
                 "created_at": user.created_at,
                 "links": db.query(Link).filter(Link.user_id == user.id).count(),
+                "trashed_links": db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.isnot(None)).count(),
                 "tabs": db.query(Tab).filter(Tab.user_id == user.id).count(),
             }
             for user in users

@@ -114,6 +114,9 @@ class LinkBase(BaseModel):
     tags: List[str] = Field(default_factory=list)
     is_favorite: bool = False
     is_pinned: bool = False
+    is_read: bool = False
+    priority: Optional[str] = "normal"
+    reminder_at: Optional[datetime] = None
     note: Optional[str] = None
 
     @field_validator("url")
@@ -136,6 +139,9 @@ class LinkUpdate(BaseModel):
     tags: Optional[List[str]] = None
     is_favorite: Optional[bool] = None
     is_pinned: Optional[bool] = None
+    is_read: Optional[bool] = None
+    priority: Optional[str] = None
+    reminder_at: Optional[datetime] = None
     note: Optional[str] = None
     sort_order: Optional[int] = None
     content: Optional[str] = None
@@ -149,9 +155,11 @@ class LinkUpdate(BaseModel):
 
 class LinkOut(LinkBase):
     id: int
+    canonical_url: Optional[str] = None
     sort_order: int
     created_at: datetime
     updated_at: datetime
+    deleted_at: Optional[datetime] = None
     http_status: Optional[int] = None
     last_checked: Optional[datetime] = None
     content: Optional[str] = None
@@ -167,12 +175,97 @@ class LinkOut(LinkBase):
 
 class BulkLinkAction(BaseModel):
     link_ids: List[int]
-    action: str  # "delete", "move", "pin", "unpin", "favorite", "unfavorite"
+    action: str
     tab_id: Optional[int] = None
+    tags: List[str] = Field(default_factory=list)
+    priority: Optional[str] = None
 
 
 class BulkResult(BaseModel):
     affected: int
+    action: Optional[str] = None
+
+
+class LinkHistoryOut(BaseModel):
+    id: int
+    action: str
+    changes: dict = Field(default_factory=dict)
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class LinkAttachmentOut(BaseModel):
+    id: int
+    filename: str
+    content_type: Optional[str] = None
+    size: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class LinkDetailOut(BaseModel):
+    link: LinkOut
+    history: List[LinkHistoryOut] = Field(default_factory=list)
+    archives: List[dict] = Field(default_factory=list)
+    highlights: List[dict] = Field(default_factory=list)
+    attachments: List[LinkAttachmentOut] = Field(default_factory=list)
+
+
+class AttachmentCreate(BaseModel):
+    filename: str = Field(min_length=1, max_length=256)
+    content_type: Optional[str] = Field(default=None, max_length=128)
+    data_url: str = Field(min_length=1, max_length=2_500_000)
+
+
+class ImportPreviewOut(BaseModel):
+    mode: str
+    tabs_new: int = 0
+    tabs_existing: int = 0
+    links_new: int = 0
+    links_existing: int = 0
+    links_invalid: int = 0
+    replace_deletes_links: int = 0
+    replace_deletes_tabs: int = 0
+    sample_links: List[dict] = Field(default_factory=list)
+
+
+class ApiTokenCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    scopes: List[str] = Field(default_factory=lambda: ["links:read", "links:write"])
+
+
+class ApiTokenOut(BaseModel):
+    id: int
+    name: str
+    token_prefix: str
+    scopes: List[str] = Field(default_factory=list)
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+    revoked_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ApiTokenCreated(ApiTokenOut):
+    token: str
+
+
+class NotificationOut(BaseModel):
+    id: int
+    type: str
+    title: str
+    body: Optional[str] = None
+    payload: dict = Field(default_factory=dict)
+    read_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 # ── Metadata ─────────────────────────────────────────

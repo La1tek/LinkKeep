@@ -35,7 +35,7 @@ def upsert_link_index(db: Session, link: Link) -> LinkSearchIndex:
 
 def rebuild_user_index(db: Session, user_id: int) -> int:
     db.query(LinkSearchIndex).filter(LinkSearchIndex.user_id == user_id).delete()
-    links = db.query(Link).filter(Link.user_id == user_id).all()
+    links = db.query(Link).filter(Link.user_id == user_id, Link.deleted_at.is_(None)).all()
     for link in links:
         upsert_link_index(db, link)
     db.flush()
@@ -61,6 +61,6 @@ def search_user_links(db: Session, user_id: int, query: str, limit: int, offset:
     if not link_ids:
         return []
 
-    links = db.query(Link).filter(Link.user_id == user_id, Link.id.in_(link_ids)).all()
+    links = db.query(Link).filter(Link.user_id == user_id, Link.deleted_at.is_(None), Link.id.in_(link_ids)).all()
     by_id = {link.id: link for link in links}
     return [by_id[link_id] for link_id in link_ids if link_id in by_id]

@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -6,7 +8,7 @@ from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 
 from app.database import get_db
-from app.models import SessionToken, User
+from app.models import ApiToken, SessionToken, User
 from app.schemas import SessionOut, UserCreate, UserOut, Token
 from app.auth import get_password_hash, verify_password, create_access_token, decode_token
 from app import config
@@ -25,6 +27,8 @@ def _cred_exception() -> HTTPException:
 
 
 def _decode_bearer_token(token: str) -> dict:
+    if token.startswith("lkat_"):
+        return {"api_token": token}
     try:
         payload = decode_token(token)
         if payload.get("sub") is None:
@@ -50,6 +54,19 @@ def _get_current_user(payload: dict = Depends(_get_current_payload), db: Session
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    api_token_value = payload.get("api_token")
+    if api_token_value:
+        token_hash = hashlib.sha256(api_token_value.encode("utf-8")).hexdigest()
+        api_token = db.query(ApiToken).filter(ApiToken.token_hash == token_hash, ApiToken.revoked_at.is_(None)).first()
+        if api_token is None:
+            raise cred_exc
+        api_token.last_used_at = datetime.now(timezone.utc)
+        db.commit()
+        user = db.query(User).filter(User.id == api_token.user_id).first()
+        if user is None:
+            raise cred_exc
+        return user
+
     subject = payload.get("sub")
     user = None
     try:
@@ -67,6 +84,14 @@ def _get_current_user(payload: dict = Depends(_get_current_payload), db: Session
         if session is None or session.revoked_at is not None or _as_utc(session.expires_at) <= now:
             raise cred_exc
     return user
+
+
+def hash_api_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def verify_api_token(token: str, token_hash: str) -> bool:
+    return hmac.compare_digest(hash_api_token(token), token_hash)
 
 
 @router.post("/register", response_model=UserOut, status_code=201)

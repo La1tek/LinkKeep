@@ -22,6 +22,8 @@ class User(Base):
     jobs = relationship("Job", back_populates="owner", cascade="all, delete-orphan")
     snapshots = relationship("BackupSnapshot", back_populates="owner", cascade="all, delete-orphan")
     shares = relationship("SharedCollection", back_populates="owner", cascade="all, delete-orphan")
+    api_tokens = relationship("ApiToken", back_populates="owner", cascade="all, delete-orphan")
+    notifications = relationship("AppNotification", back_populates="owner", cascade="all, delete-orphan")
 
 
 class Tab(Base):
@@ -49,6 +51,7 @@ class Link(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(256), nullable=False)
     url = Column(Text, nullable=False)
+    canonical_url = Column(Text, nullable=True, index=True)
     description = Column(Text, nullable=True)
     favicon = Column(String(512), nullable=True)
     image = Column(Text, nullable=True)
@@ -56,6 +59,9 @@ class Link(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     is_favorite = Column(Boolean, default=False)
     is_pinned = Column(Boolean, default=False)
+    is_read = Column(Boolean, default=False)
+    priority = Column(String(16), default="normal")
+    reminder_at = Column(DateTime, nullable=True)
     note = Column(Text, nullable=True)
     sort_order = Column(Integer, default=0)
     tags = Column(JSON, default=list)
@@ -63,6 +69,7 @@ class Link(Base):
     last_checked = Column(DateTime, nullable=True)
     content = Column(Text, nullable=True)
     content_fetched = Column(DateTime, nullable=True)
+    deleted_at = Column(DateTime, nullable=True, index=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -70,6 +77,8 @@ class Link(Base):
     tab = relationship("Tab", back_populates="links")
     archives = relationship("LinkArchive", back_populates="link", cascade="all, delete-orphan", order_by="desc(LinkArchive.created_at)")
     highlights = relationship("LinkHighlight", back_populates="link", cascade="all, delete-orphan")
+    history = relationship("LinkHistory", back_populates="link", cascade="all, delete-orphan", order_by="desc(LinkHistory.created_at)")
+    attachments = relationship("LinkAttachment", back_populates="link", cascade="all, delete-orphan", order_by="desc(LinkAttachment.created_at)")
 
     @property
     def archive_status(self) -> str | None:
@@ -260,3 +269,64 @@ class LinkHighlight(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     link = relationship("Link", back_populates="highlights")
+
+
+class LinkHistory(Base):
+    __tablename__ = "link_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    link_id = Column(Integer, ForeignKey("links.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    action = Column(String(64), nullable=False, index=True)
+    changes = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    link = relationship("Link", back_populates="history")
+    user = relationship("User")
+
+
+class LinkAttachment(Base):
+    __tablename__ = "link_attachments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    link_id = Column(Integer, ForeignKey("links.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    filename = Column(String(256), nullable=False)
+    content_type = Column(String(128), nullable=True)
+    size = Column(Integer, default=0, nullable=False)
+    data_url = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    link = relationship("Link", back_populates="attachments")
+    user = relationship("User")
+
+
+class ApiToken(Base):
+    __tablename__ = "api_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(120), nullable=False)
+    token_hash = Column(String(128), unique=True, index=True, nullable=False)
+    token_prefix = Column(String(16), nullable=False)
+    scopes = Column(JSON, default=list)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    last_used_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+
+    owner = relationship("User", back_populates="api_tokens")
+
+
+class AppNotification(Base):
+    __tablename__ = "app_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    type = Column(String(64), nullable=False, index=True)
+    title = Column(String(160), nullable=False)
+    body = Column(Text, nullable=True)
+    payload = Column(JSON, default=dict)
+    read_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    owner = relationship("User", back_populates="notifications")
