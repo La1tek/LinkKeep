@@ -183,14 +183,26 @@ def public_profile(username: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == username).first()
     if not user:
         raise HTTPException(status_code=404, detail="Profile not found")
+    profile = (user.settings or {}).get("profile") or {}
+    if profile.get("is_public", True) is False:
+        raise HTTPException(status_code=404, detail="Profile not found")
     shares = (
         db.query(SharedCollection)
         .filter(SharedCollection.user_id == user.id, SharedCollection.public_profile == True, SharedCollection.is_active == True)
         .order_by(SharedCollection.created_at.desc())
         .all()
     )
+    public_shares = [share for share in shares if not share.expires_at or share.expires_at.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc)]
+    link_count = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).count()
     return {
         "username": user.username,
+        "display_name": profile.get("display_name") or user.username,
+        "headline": profile.get("headline") or "Curated link atlas",
+        "bio": profile.get("bio") or "",
+        "location": profile.get("location") or "",
+        "website": profile.get("website") or "",
+        "accent": profile.get("accent") or "#7c8cff",
         "created_at": user.created_at,
-        "shares": [_share_out(share) for share in shares if not share.expires_at or share.expires_at.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc)],
+        "stats": {"public_collections": len(public_shares), "saved_links": link_count},
+        "shares": [_share_out(share) for share in public_shares],
     }

@@ -24,6 +24,9 @@ class User(Base):
     shares = relationship("SharedCollection", back_populates="owner", cascade="all, delete-orphan")
     api_tokens = relationship("ApiToken", back_populates="owner", cascade="all, delete-orphan")
     notifications = relationship("AppNotification", back_populates="owner", cascade="all, delete-orphan")
+    automation_rules = relationship("AutomationRule", back_populates="owner", cascade="all, delete-orphan")
+    workspaces = relationship("WorkspaceMember", back_populates="user", cascade="all, delete-orphan")
+    webhooks = relationship("WebhookEndpoint", back_populates="owner", cascade="all, delete-orphan")
 
 
 class Tab(Base):
@@ -79,6 +82,8 @@ class Link(Base):
     highlights = relationship("LinkHighlight", back_populates="link", cascade="all, delete-orphan")
     history = relationship("LinkHistory", back_populates="link", cascade="all, delete-orphan", order_by="desc(LinkHistory.created_at)")
     attachments = relationship("LinkAttachment", back_populates="link", cascade="all, delete-orphan", order_by="desc(LinkAttachment.created_at)")
+    health_checks = relationship("LinkHealthCheck", back_populates="link", cascade="all, delete-orphan", order_by="desc(LinkHealthCheck.checked_at)")
+    summaries = relationship("LinkSummary", back_populates="link", cascade="all, delete-orphan", order_by="desc(LinkSummary.created_at)")
 
     @property
     def archive_status(self) -> str | None:
@@ -330,3 +335,126 @@ class AppNotification(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     owner = relationship("User", back_populates="notifications")
+
+
+class AutomationRule(Base):
+    __tablename__ = "automation_rules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(160), nullable=False)
+    trigger = Column(String(48), default="link_created", nullable=False, index=True)
+    is_enabled = Column(Boolean, default=True, nullable=False)
+    conditions = Column(JSON, default=dict)
+    actions = Column(JSON, default=dict)
+    run_count = Column(Integer, default=0, nullable=False)
+    last_run_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    owner = relationship("User", back_populates="automation_rules")
+
+
+class LinkHealthCheck(Base):
+    __tablename__ = "link_health_checks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    link_id = Column(Integer, ForeignKey("links.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(Integer, nullable=False)
+    final_url = Column(Text, nullable=True)
+    error = Column(Text, nullable=True)
+    checked_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+
+    link = relationship("Link", back_populates="health_checks")
+    user = relationship("User")
+
+
+class LinkSummary(Base):
+    __tablename__ = "link_summaries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    link_id = Column(Integer, ForeignKey("links.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    summary = Column(Text, nullable=False)
+    tldr = Column(Text, nullable=True)
+    language = Column(String(16), nullable=True)
+    reading_time_minutes = Column(Integer, default=1, nullable=False)
+    suggested_tags = Column(JSON, default=list)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    link = relationship("Link", back_populates="summaries")
+    user = relationship("User")
+
+
+class Workspace(Base):
+    __tablename__ = "workspaces"
+
+    id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(160), nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    owner = relationship("User")
+    members = relationship("WorkspaceMember", back_populates="workspace", cascade="all, delete-orphan")
+
+
+class WorkspaceMember(Base):
+    __tablename__ = "workspace_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String(32), default="member", nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    workspace = relationship("Workspace", back_populates="members")
+    user = relationship("User", back_populates="workspaces")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True)
+    action = Column(String(80), nullable=False, index=True)
+    payload = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    user = relationship("User")
+    workspace = relationship("Workspace")
+
+
+class WebhookEndpoint(Base):
+    __tablename__ = "webhook_endpoints"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(160), nullable=False)
+    url = Column(Text, nullable=False)
+    events = Column(JSON, default=list)
+    secret = Column(String(128), nullable=True)
+    is_enabled = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    owner = relationship("User", back_populates="webhooks")
+    deliveries = relationship("WebhookDelivery", back_populates="webhook", cascade="all, delete-orphan")
+
+
+class WebhookDelivery(Base):
+    __tablename__ = "webhook_deliveries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    webhook_id = Column(Integer, ForeignKey("webhook_endpoints.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    event = Column(String(80), nullable=False, index=True)
+    payload = Column(JSON, default=dict)
+    status = Column(String(32), default="queued", nullable=False)
+    response_status = Column(Integer, nullable=True)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    delivered_at = Column(DateTime, nullable=True)
+
+    webhook = relationship("WebhookEndpoint", back_populates="deliveries")
+    user = relationship("User")

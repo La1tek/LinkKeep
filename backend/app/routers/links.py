@@ -4,12 +4,13 @@ from typing import List, Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from app.database import get_db
-from app.models import AppNotification, LinkAttachment, LinkHistory, User, Link, Tab, LinkHighlight
+from app.models import AppNotification, LinkArchive, LinkAttachment, LinkHealthCheck, LinkHistory, User, Link, Tab, LinkHighlight
 from app.schemas import (
     AttachmentCreate, LinkCreate, LinkDetailOut, LinkUpdate, LinkOut,
     BulkLinkAction, BulkResult,
 )
 from app.routers.auth import _get_current_user
+from app.services.automation import apply_automation_rules, record_webhook_event
 from app.services.link_service import validate_public_http_url
 from app.services.search_index import upsert_link_index
 from app.services.folder_access import (
@@ -266,6 +267,8 @@ def create_link(
     db.add(new_link)
     db.flush()
     _record_history(db, new_link, "created", {"title": new_link.title, "url": new_link.url})
+    apply_automation_rules(db, new_link, "link_created")
+    record_webhook_event(db, user.id, "link.created", {"link_id": new_link.id, "title": new_link.title, "url": new_link.url})
     db.commit()
     db.refresh(new_link)
     upsert_link_index(db, new_link)
@@ -333,6 +336,34 @@ def list_trash(user: User = Depends(_get_current_user), db: Session = Depends(ge
         .filter(Link.user_id == user.id, Link.deleted_at.isnot(None))
         .order_by(Link.deleted_at.desc())
         .limit(500)
+        .all()
+    )
+
+
+@router.get("/duplicates")
+def find_duplicates(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    links = _base_links_query(db, user.id).all()
+    groups = {}
+    for link in links:
+        url_norm = link.canonical_url or _canonicalize_url(link.url) or _normalize_url_for_duplicates(link.url)
+        groups.setdefault(url_norm, []).append({"id": link.id, "title": link.title, "url": link.url, "tags": link.tags or [], "note": link.note})
+    dups = [
+        {"url": group[0]["url"], "canonical_url": key, "links": group}
+        for key, group in groups.items()
+        if len(group) > 1
+    ]
+    return {"duplicates": dups, "count": len(dups)}
+
+
+@router.get("/dead", response_model=List[LinkOut])
+def get_dead_links(
+    user: User = Depends(_get_current_user),
+    db: Session = Depends(get_db),
+):
+    return (
+        db.query(Link)
+        .filter(Link.user_id == user.id, Link.deleted_at.is_(None), (Link.http_status >= 400) | (Link.http_status == 0))
+        .order_by(Link.http_status.desc(), Link.last_checked.desc())
         .all()
     )
 
@@ -592,21 +623,6 @@ def reorder_links(
     return {"status": "ok"}
 
 
-@router.get("/duplicates")
-def find_duplicates(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
-    links = _base_links_query(db, user.id).all()
-    groups = {}
-    for link in links:
-        url_norm = link.canonical_url or _canonicalize_url(link.url) or _normalize_url_for_duplicates(link.url)
-        groups.setdefault(url_norm, []).append({"id": link.id, "title": link.title, "url": link.url})
-    dups = [
-        {"url": group[0]["url"], "links": group}
-        for group in groups.values()
-        if len(group) > 1
-    ]
-    return {"duplicates": dups, "count": len(dups)}
-
-
 @router.get("/{link_id}/highlights")
 def list_highlights(link_id: int, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
     link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id, Link.deleted_at.is_(None)).first()
@@ -675,6 +691,8 @@ def merge_duplicates(
 
     for source in sources:
         _merge_source_into_target(target, source)
+        for model in (LinkHighlight, LinkArchive, LinkAttachment, LinkHistory, LinkHealthCheck):
+            db.query(model).filter(model.link_id == source.id, model.user_id == user.id).update({"link_id": target.id}, synchronize_session=False)
         _record_history(db, target, "duplicate_merged", {"source_id": source.id, "source_title": source.title})
         db.delete(source)
 
@@ -703,17 +721,24 @@ def check_link_health(
 
     with httpx.Client(timeout=15, follow_redirects=True, trust_env=False) as client:
         for link in links:
+            error = None
+            final_url = None
             try:
                 validate_public_http_url(link.url)
                 resp = client.head(link.url)
                 status = resp.status_code
+                final_url = str(resp.url)
             except ValueError:
                 status = 0
-            except httpx.HTTPError:
+                error = "Invalid URL"
+            except httpx.HTTPError as exc:
                 status = 0
+                error = str(exc)[:2000]
 
             link.http_status = status
             link.last_checked = datetime.now(timezone.utc)
+            db.add(LinkHealthCheck(link_id=link.id, user_id=user.id, status=status, final_url=final_url, error=error))
+            apply_automation_rules(db, link, "health_check")
             checked += 1
 
             if status and status < 400:
@@ -727,20 +752,6 @@ def check_link_health(
 
     db.commit()
     return {"checked": checked, "alive": alive, "dead": dead, "redirects": redirects}
-
-
-@router.get("/dead", response_model=List[LinkOut])
-def get_dead_links(
-    user: User = Depends(_get_current_user),
-    db: Session = Depends(get_db),
-):
-    return (
-        db.query(Link)
-        .filter(Link.user_id == user.id, Link.deleted_at.is_(None), (Link.http_status >= 400) | (Link.http_status == 0))
-        .order_by(Link.http_status.desc())
-        .all()
-    )
-
 
 # ── Reader Mode (Content Fetching) ─────────────────
 

@@ -11,7 +11,7 @@ import asyncio
 from app.database import Base, get_db, engine
 from app.migrations import run_startup_migrations
 from app.middleware import RateLimitMiddleware, RequestContextMiddleware, SecurityHeadersMiddleware
-from app.routers import admin, archives, auth, jobs, links, metadata, recommendations, search, settings, shares, stats, tabs, tags
+from app.routers import admin, archives, auth, jobs, links, metadata, productivity, recommendations, search, settings, shares, stats, tabs, tags
 from app.config import CORS_ORIGINS, CORS_ORIGIN_REGEX, JOB_WORKER_ENABLED
 from app.services.jobs import start_job_worker
 from app.version import APP_VERSION
@@ -69,6 +69,7 @@ app.include_router(archives.router)
 app.include_router(search.router)
 app.include_router(shares.router)
 app.include_router(shares.public_router)
+app.include_router(productivity.router)
 app.include_router(recommendations.router)
 app.include_router(admin.router)
 

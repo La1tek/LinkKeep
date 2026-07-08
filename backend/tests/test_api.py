@@ -815,3 +815,108 @@ class TestMetadataSecurity:
     def test_metadata_rejects_localhost_url(self, client, auth_user):
         resp = client.post("/api/metadata", json={"url": "http://127.0.0.1:8000/private"}, headers=auth_user)
         assert resp.status_code == 400
+
+
+class TestProductivitySuite:
+    def test_default_rules_apply_to_new_links(self, client, auth_user):
+        defaults = client.post("/api/rules/defaults", headers=auth_user)
+        assert defaults.status_code == 200
+
+        video = client.post("/api/links", json={"title": "YT", "url": "https://www.youtube.com/watch?v=1"}, headers=auth_user)
+        docs = client.post("/api/links", json={"title": "Docs", "url": "https://example.com/docs/start"}, headers=auth_user)
+        assert video.status_code == 201
+        assert docs.status_code == 201
+
+        tabs = client.get("/api/tabs", headers=auth_user).json()
+        names = {tab["name"]: tab["id"] for tab in tabs}
+        assert "Video" in names
+        assert "Inbox" in names
+        assert video.json()["tab_id"] == names["Video"]
+        assert "docs" in docs.json()["tags"]
+        assert docs.json()["tab_id"] == names["Inbox"]
+
+        rules = client.get("/api/rules", headers=auth_user)
+        assert rules.status_code == 200
+        assert len(rules.json()["rules"]) == 5
+
+    def test_inbox_smart_semantic_reader_summary_and_highlight_export(self, client, auth_user):
+        link = client.post(
+            "/api/links",
+            json={
+                "title": "Design dashboard",
+                "url": "https://figma.com/blog/dashboard-design",
+                "tags": ["design"],
+            },
+            headers=auth_user,
+        ).json()
+        client.put(
+            f"/api/links/{link['id']}",
+            json={"content": "Dashboard design systems need hierarchy, typography and clear analytics."},
+            headers=auth_user,
+        )
+
+        inbox = client.get("/api/inbox", headers=auth_user)
+        assert inbox.status_code == 200
+        assert inbox.json()["count"] == 1
+        reviewed = client.post("/api/inbox/review", json={"link_ids": [link["id"]], "action": "read"}, headers=auth_user)
+        assert reviewed.status_code == 200
+        assert client.get("/api/inbox", headers=auth_user).json()["count"] == 0
+
+        smart = client.post("/api/search/smart", json={"name": "Design", "query": "tag:design"}, headers=auth_user).json()
+        smart_links = client.get(f"/api/smart/{smart['id']}/links", headers=auth_user)
+        assert smart_links.status_code == 200
+        assert smart_links.json()["links"][0]["id"] == link["id"]
+
+        semantic = client.get("/api/search/semantic?q=analytics hierarchy", headers=auth_user)
+        assert semantic.status_code == 200
+        assert semantic.json()["links"][0]["link"]["id"] == link["id"]
+
+        reader = client.get(f"/api/reader/{link['id']}", headers=auth_user)
+        assert reader.status_code == 200
+        assert "Dashboard design" in reader.json()["content"]
+
+        summary = client.post(f"/api/links/{link['id']}/summarize", headers=auth_user)
+        assert summary.status_code == 200
+        assert summary.json()["reading_time_minutes"] >= 1
+
+        highlight = client.post(f"/api/links/{link['id']}/highlights", json={"text": "clear analytics", "note": "important"}, headers=auth_user)
+        assert highlight.status_code == 201
+        exported = client.get("/api/highlights/export?format=obsidian", headers=auth_user)
+        assert exported.status_code == 200
+        assert "clear analytics" in exported.json()["content"]
+
+    def test_workspaces_webhooks_profile_and_duplicate_merge_preserve_highlights(self, client, auth_user):
+        workspace = client.post("/api/workspaces", json={"name": "Team"}, headers=auth_user)
+        assert workspace.status_code == 201
+        assert client.get("/api/workspaces", headers=auth_user).json()["workspaces"][0]["name"] == "Team"
+
+        webhook = client.post(
+            "/api/webhooks",
+            json={"name": "Created", "url": "https://example.com/hook", "events": ["link.created", "webhook.test"]},
+            headers=auth_user,
+        )
+        assert webhook.status_code == 201
+        assert client.post(f"/api/webhooks/{webhook.json()['id']}/test", headers=auth_user).json()["queued"] == 1
+
+        target = client.post("/api/links", json={"title": "Target", "url": "https://merge.example.com"}, headers=auth_user).json()
+        source = client.post("/api/links", json={"title": "Source", "url": "https://www.merge.example.com/"}, headers=auth_user).json()
+        client.post(f"/api/links/{source['id']}/highlights", json={"text": "move this highlight"}, headers=auth_user)
+        merge = client.post("/api/links/duplicates/merge", json={"target_id": target["id"], "source_ids": [source["id"]]}, headers=auth_user)
+        assert merge.status_code == 200
+        highlights = client.get(f"/api/links/{target['id']}/highlights", headers=auth_user)
+        assert highlights.status_code == 200
+        assert highlights.json()["highlights"][0]["text"] == "move this highlight"
+
+        deliveries = client.get("/api/webhooks/deliveries", headers=auth_user)
+        assert deliveries.status_code == 200
+        assert len(deliveries.json()["deliveries"]) >= 1
+
+        profile = client.put(
+            "/api/profile",
+            json={"display_name": "Ilya Links", "headline": "Personal atlas", "bio": "Curated research links", "accent": "#7c8cff"},
+            headers=auth_user,
+        )
+        assert profile.status_code == 200
+        public = client.get("/api/public/profiles/testuser")
+        assert public.status_code == 200
+        assert public.json()["display_name"] == "Ilya Links"

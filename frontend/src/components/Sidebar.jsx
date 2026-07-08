@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Plus, X, GearSix, SignOut, Star, Stack, CaretDown, CaretRight, Link as LinkIcon, Sparkle, ShieldCheck, LockKey, ArrowSquareIn, Trash } from '@phosphor-icons/react'
+import { Plus, X, GearSix, SignOut, Star, Stack, CaretDown, CaretRight, Link as LinkIcon, Sparkle, ShieldCheck, LockKey, ArrowSquareIn, Trash, Lightning } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AnimatedCounter from './AnimatedCounter'
@@ -71,6 +71,7 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
   const isFavActive = activePath === '/favorites'
   const isSharesActive = activePath === '/shares'
   const isRecommendationsActive = activePath === '/recommendations'
+  const isWorkflowsActive = activePath === '/workflows'
   const isTrashActive = activePath === '/trash'
   const isAdminActive = activePath === '/admin'
   const allLinksCount = safeTabs.reduce((sum, tab) => sum + Number(tab.link_count || 0), 0)
@@ -286,6 +287,18 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
           <span>Tools</span>
           {protectedCount > 0 && <span className="metadata-line text-[10px]">{protectedCount} protected</span>}
         </div>
+
+        <motion.button
+          layout
+          onClick={() => navigate('/workflows')}
+          className={`atlas-nav-item atlas-system-row w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${isWorkflowsActive ? 'is-active' : ''}`}
+          style={{
+            color: isWorkflowsActive ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+          }}
+        >
+          <Lightning size={16} weight="fill" />
+          <span>Workflows</span>
+        </motion.button>
 
         <motion.button
           layout

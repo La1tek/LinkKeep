@@ -95,3 +95,120 @@ def run_startup_migrations(engine):
         )
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_app_notifications_user_id ON app_notifications(user_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_app_notifications_type ON app_notifications(type)")
+
+        conn.exec_driver_sql(
+            "CREATE TABLE IF NOT EXISTS automation_rules ("
+            "id INTEGER PRIMARY KEY, "
+            "user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+            "name VARCHAR(160) NOT NULL, "
+            "trigger VARCHAR(48) DEFAULT 'link_created' NOT NULL, "
+            "is_enabled BOOLEAN DEFAULT 1 NOT NULL, "
+            "conditions JSON, "
+            "actions JSON, "
+            "run_count INTEGER DEFAULT 0 NOT NULL, "
+            "last_run_at TIMESTAMP, "
+            "created_at TIMESTAMP NOT NULL"
+            ")"
+        )
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_automation_rules_user_id ON automation_rules(user_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_automation_rules_trigger ON automation_rules(trigger)")
+
+        conn.exec_driver_sql(
+            "CREATE TABLE IF NOT EXISTS link_health_checks ("
+            "id INTEGER PRIMARY KEY, "
+            "link_id INTEGER NOT NULL REFERENCES links(id) ON DELETE CASCADE, "
+            "user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+            "status INTEGER NOT NULL, "
+            "final_url TEXT, "
+            "error TEXT, "
+            "checked_at TIMESTAMP NOT NULL"
+            ")"
+        )
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_link_health_checks_link_id ON link_health_checks(link_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_link_health_checks_user_id ON link_health_checks(user_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_link_health_checks_checked_at ON link_health_checks(checked_at)")
+
+        conn.exec_driver_sql(
+            "CREATE TABLE IF NOT EXISTS link_summaries ("
+            "id INTEGER PRIMARY KEY, "
+            "link_id INTEGER NOT NULL REFERENCES links(id) ON DELETE CASCADE, "
+            "user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+            "summary TEXT NOT NULL, "
+            "tldr TEXT, "
+            "language VARCHAR(16), "
+            "reading_time_minutes INTEGER DEFAULT 1 NOT NULL, "
+            "suggested_tags JSON, "
+            "created_at TIMESTAMP NOT NULL"
+            ")"
+        )
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_link_summaries_link_id ON link_summaries(link_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_link_summaries_user_id ON link_summaries(user_id)")
+
+        conn.exec_driver_sql(
+            "CREATE TABLE IF NOT EXISTS workspaces ("
+            "id INTEGER PRIMARY KEY, "
+            "owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+            "name VARCHAR(160) NOT NULL, "
+            "description TEXT, "
+            "created_at TIMESTAMP NOT NULL"
+            ")"
+        )
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_workspaces_owner_id ON workspaces(owner_id)")
+
+        conn.exec_driver_sql(
+            "CREATE TABLE IF NOT EXISTS workspace_members ("
+            "id INTEGER PRIMARY KEY, "
+            "workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE, "
+            "user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+            "role VARCHAR(32) DEFAULT 'member' NOT NULL, "
+            "created_at TIMESTAMP NOT NULL"
+            ")"
+        )
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_workspace_members_workspace_id ON workspace_members(workspace_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_workspace_members_user_id ON workspace_members(user_id)")
+
+        conn.exec_driver_sql(
+            "CREATE TABLE IF NOT EXISTS audit_logs ("
+            "id INTEGER PRIMARY KEY, "
+            "user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+            "workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL, "
+            "action VARCHAR(80) NOT NULL, "
+            "payload JSON, "
+            "created_at TIMESTAMP NOT NULL"
+            ")"
+        )
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_audit_logs_user_id ON audit_logs(user_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_audit_logs_workspace_id ON audit_logs(workspace_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_audit_logs_action ON audit_logs(action)")
+
+        conn.exec_driver_sql(
+            "CREATE TABLE IF NOT EXISTS webhook_endpoints ("
+            "id INTEGER PRIMARY KEY, "
+            "user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+            "name VARCHAR(160) NOT NULL, "
+            "url TEXT NOT NULL, "
+            "events JSON, "
+            "secret VARCHAR(128), "
+            "is_enabled BOOLEAN DEFAULT 1 NOT NULL, "
+            "created_at TIMESTAMP NOT NULL"
+            ")"
+        )
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_webhook_endpoints_user_id ON webhook_endpoints(user_id)")
+
+        conn.exec_driver_sql(
+            "CREATE TABLE IF NOT EXISTS webhook_deliveries ("
+            "id INTEGER PRIMARY KEY, "
+            "webhook_id INTEGER NOT NULL REFERENCES webhook_endpoints(id) ON DELETE CASCADE, "
+            "user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+            "event VARCHAR(80) NOT NULL, "
+            "payload JSON, "
+            "status VARCHAR(32) DEFAULT 'queued' NOT NULL, "
+            "response_status INTEGER, "
+            "error TEXT, "
+            "created_at TIMESTAMP NOT NULL, "
+            "delivered_at TIMESTAMP"
+            ")"
+        )
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_webhook_deliveries_webhook_id ON webhook_deliveries(webhook_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_webhook_deliveries_user_id ON webhook_deliveries(user_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_webhook_deliveries_event ON webhook_deliveries(event)")

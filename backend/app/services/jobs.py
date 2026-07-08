@@ -11,15 +11,17 @@ from sqlalchemy.orm import Session
 
 from app import config
 from app.database import SessionLocal
-from app.models import BackupSnapshot, Job, Link, User
+from app.models import BackupSnapshot, Job, Link, LinkHealthCheck, User
 from app.routers.settings import _export_user_data
+from app.services.archive import create_link_archive
+from app.services.automation import apply_automation_rules
 from app.services.link_service import fetch_metadata, validate_public_http_url
 from app.services.search_index import rebuild_user_index, upsert_link_index
 
 logger = logging.getLogger("linkkeep.jobs")
 
 
-JOB_TYPES = {"backup_snapshot", "rebuild_search_index", "refresh_metadata", "check_link_health"}
+JOB_TYPES = {"backup_snapshot", "rebuild_search_index", "refresh_metadata", "check_link_health", "archive_links"}
 
 
 def enqueue_job(db: Session, job_type: str, user_id: int | None, payload: dict | None = None) -> Job:
@@ -115,19 +117,38 @@ def run_job(db: Session, job: Job) -> dict:
         checked = dead = alive = 0
         with httpx.Client(timeout=10, follow_redirects=True, trust_env=False) as client:
             for link in links:
+                error = None
+                final_url = None
                 try:
                     validate_public_http_url(link.url)
-                    status = client.head(link.url).status_code
-                except Exception:
+                    response = client.head(link.url)
+                    status = response.status_code
+                    final_url = str(response.url)
+                except Exception as exc:
                     status = 0
+                    error = str(exc)[:2000]
                 link.http_status = status
                 link.last_checked = datetime.now(timezone.utc)
+                db.add(LinkHealthCheck(link_id=link.id, user_id=user.id, status=status, final_url=final_url, error=error))
+                apply_automation_rules(db, link, "health_check")
                 checked += 1
                 if status and status < 400:
                     alive += 1
                 else:
                     dead += 1
         return {"checked": checked, "alive": alive, "dead": dead}
+
+    if job.type == "archive_links":
+        ids = [int(item) for item in job.payload.get("link_ids", []) if str(item).isdigit()]
+        query = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None))
+        if ids:
+            query = query.filter(Link.id.in_(ids))
+        links = query.order_by(Link.created_at.desc()).limit(int(job.payload.get("limit", 10))).all()
+        archived = 0
+        for link in links:
+            asyncio.run(create_link_archive(db, link))
+            archived += 1
+        return {"archived": archived}
 
     raise ValueError("Unsupported job type")
 

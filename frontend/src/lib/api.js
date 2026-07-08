@@ -130,6 +130,7 @@ export const api = {
   listSmartCollections: () => request('/search/smart'),
   createSmartCollection: (data) => request('/search/smart', { method: 'POST', body: data }),
   deleteSmartCollection: (id) => request(`/search/smart/${id}`, { method: 'DELETE' }),
+  getSmartCollectionLinks: (id) => request(`/smart/${id}/links`),
   me: () => request('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),
   listSessions: () => request('/auth/sessions'),
@@ -181,6 +182,9 @@ export const api = {
   archiveLink: (linkId) => request(`/links/${linkId}/archive`, { method: 'POST' }),
   listArchives: (linkId) => request(`/links/${linkId}/archives`),
   getArchive: (archiveId) => request(`/archives/${archiveId}`),
+  getReader: (linkId) => request(`/reader/${linkId}`),
+  summarizeLink: (linkId) => request(`/links/${linkId}/summarize`, { method: 'POST' }),
+  getRelatedLinks: (linkId) => request(`/links/${linkId}/related`),
 
   // Metadata
   fetchMetadata: (url) => request('/metadata', { method: 'POST', body: { url } }),
@@ -240,6 +244,32 @@ export const api = {
   // Recommendations
   getRecommendations: () => request('/recommendations'),
   applyRecommendedTags: () => request('/recommendations/apply-tags', { method: 'POST' }),
+
+  // Productivity suite
+  listRules: () => request('/rules'),
+  createRule: (data) => request('/rules', { method: 'POST', body: data }),
+  updateRule: (id, data) => request(`/rules/${id}`, { method: 'PUT', body: data }),
+  deleteRule: (id) => request(`/rules/${id}`, { method: 'DELETE' }),
+  createDefaultRules: () => request('/rules/defaults', { method: 'POST' }),
+  runRules: (trigger = 'link_created') => request(`/rules/run?trigger=${encodeURIComponent(trigger)}`, { method: 'POST' }),
+  listInbox: () => request('/inbox'),
+  reviewInbox: (data) => request('/inbox/review', { method: 'POST', body: data }),
+  listAllHighlights: (q = '') => request(`/highlights${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  exportHighlights: (format = 'markdown') => request(`/highlights/export?format=${encodeURIComponent(format)}`),
+  semanticSearch: (q) => request(`/search/semantic?q=${encodeURIComponent(q)}`),
+  healthHistory: () => request('/health/history'),
+  linkHealthHistory: (linkId) => request(`/links/${linkId}/health-history`),
+  listWorkspaces: () => request('/workspaces'),
+  createWorkspace: (data) => request('/workspaces', { method: 'POST', body: data }),
+  addWorkspaceMember: (id, data) => request(`/workspaces/${id}/members`, { method: 'POST', body: data }),
+  auditLog: () => request('/audit'),
+  listWebhooks: () => request('/webhooks'),
+  createWebhook: (data) => request('/webhooks', { method: 'POST', body: data }),
+  deleteWebhook: (id) => request(`/webhooks/${id}`, { method: 'DELETE' }),
+  testWebhook: (id) => request(`/webhooks/${id}/test`, { method: 'POST' }),
+  webhookDeliveries: () => request('/webhooks/deliveries'),
+  getProfile: () => request('/profile'),
+  updateProfile: (data) => request('/profile', { method: 'PUT', body: data }),
 
   // Admin
   adminOverview: () => request('/admin/overview'),
