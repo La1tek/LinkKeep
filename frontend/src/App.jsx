@@ -12,6 +12,7 @@ import Duplicates from './pages/Duplicates'
 import Shares from './pages/Shares'
 import Recommendations from './pages/Recommendations'
 import Admin from './pages/Admin'
+import Trash from './pages/Trash'
 import PublicShare from './pages/PublicShare'
 import PublicProfile from './pages/PublicProfile'
 import Sidebar from './components/Sidebar'
@@ -176,6 +177,7 @@ export default function App() {
               <Route path="/duplicates" element={<Duplicates token={token} />} />
               <Route path="/shares" element={<Shares />} />
               <Route path="/recommendations" element={<Recommendations />} />
+              <Route path="/trash" element={<Trash />} />
               <Route path="/admin" element={adminAvailable === false ? <Navigate to="/settings" replace /> : <Admin />} />
               <Route path="/settings" element={<Settings user={user} adminAvailable={adminAvailable === true} />} />
             </Routes>

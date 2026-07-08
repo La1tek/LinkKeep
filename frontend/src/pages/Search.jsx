@@ -5,6 +5,7 @@ import { useTabStore } from '../hooks/useTabStore'
 import { api } from '../lib/api'
 import LinkCard from '../components/LinkCard'
 import LinkModal from '../components/LinkModal'
+import LinkDetailModal from '../components/LinkDetailModal'
 import SearchBar from '../components/SearchBar'
 import EmptyState from '../components/EmptyState'
 import { LinkSkeleton } from '../components/Skeleton'
@@ -22,9 +23,10 @@ export default function Search({ token }) {
   const [smartCollections, setSmartCollections] = useState([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editingLink, setEditingLink] = useState(null)
+  const [detailLink, setDetailLink] = useState(null)
   const toast = useToast()
 
-  const { links, loading, update, remove, toggleFav } = useLinks(token, { q: search || undefined })
+  const { links, loading, update, remove, toggleFav, refresh } = useLinks(token, { q: search || undefined })
   const activeLinks = searchMode === 'fulltext' ? fulltextLinks : links
   const activeLoading = searchMode === 'fulltext' ? fulltextLoading : loading
 
@@ -79,7 +81,8 @@ export default function Search({ token }) {
   const handleDelete = async (link) => {
     const ok = await openConfirm({ title: `Delete "${link.title}"?`, danger: true, confirmText: 'Delete' })
     if (!ok) return
-    await remove(link.id); toast.success('Link deleted')
+    await remove(link.id)
+    toast.success('Link deleted', 2500, { action: 'Undo', onAction: async () => { await api.restoreLink(link.id); refresh(); toast.success('Link restored') } })
   }
 
   const handleReindex = async () => {
@@ -225,6 +228,7 @@ export default function Search({ token }) {
                 onEdit={async (l) => { if (l._inlineUpdate) { await update(l.id, l._inlineUpdate); toast.success('Link updated'); return } setEditingLink(l); setModalOpen(true) }}
                 onDelete={handleDelete}
                 onToggleFav={(l) => { toggleFav(l.id); toast.success(l.is_favorite ? 'Removed from favorites' : 'Added to favorites') }}
+                onDetails={(l) => setDetailLink(l)}
               />
             ))}
           </div>
@@ -232,6 +236,7 @@ export default function Search({ token }) {
       </main>
 
       <LinkModal open={modalOpen} onClose={() => { setModalOpen(false); setEditingLink(null) }} onSubmit={handleAdd} initial={editingLink} tabs={tabs || []} />
+      <LinkDetailModal open={!!detailLink} link={detailLink} onClose={() => setDetailLink(null)} onUpdated={() => refresh()} toast={toast} />
     </div>
   )
 }

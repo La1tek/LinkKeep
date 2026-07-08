@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Moon, Sun, SignOut, User, GithubLogo, Key, Download, Upload, Trash, ArrowRight, TelegramLogo, House, SidebarSimple, Tag } from '@phosphor-icons/react'
+import { Moon, Sun, SignOut, User, GithubLogo, Key, Download, Upload, Trash, ArrowRight, TelegramLogo, House, SidebarSimple, Tag, Bell, Copy, ShieldCheck } from '@phosphor-icons/react'
 import { useTheme } from '../lib/theme'
 import { useAuth } from '../hooks/useAuth'
 import { api } from '../lib/api'
@@ -32,6 +32,10 @@ export default function Settings({ user, adminAvailable = false }) {
   const [jobs, setJobs] = useState([])
   const [tags, setTags] = useState([])
   const [tagDrafts, setTagDrafts] = useState({})
+  const [apiTokens, setApiTokens] = useState([])
+  const [newTokenName, setNewTokenName] = useState('Browser extension')
+  const [createdToken, setCreatedToken] = useState('')
+  const [notifications, setNotifications] = useState([])
 
   useEffect(() => {
     api.getStats().then(() => {
@@ -43,6 +47,8 @@ export default function Settings({ user, adminAvailable = false }) {
     api.listTags().then((data) => setTags(data.tags || [])).catch(() => {})
     api.listSnapshots().then((data) => setSnapshots(data.snapshots || [])).catch(() => {})
     api.listJobs().then((data) => setJobs(data.jobs || [])).catch(() => {})
+    api.listApiTokens().then(setApiTokens).catch(() => {})
+    api.listNotifications().then(setNotifications).catch(() => {})
   }, [])
 
   const handleChangeUsername = async (e) => {
@@ -104,6 +110,20 @@ export default function Settings({ user, adminAvailable = false }) {
       return false
     } finally {
       setImportBusy(false)
+    }
+  }
+
+  const handlePreviewImport = async (file) => {
+    if (!file) return null
+    try {
+      if (importSource === 'generic_json') {
+        const text = await file.text()
+        return await api.previewImportData(JSON.parse(text), importMode)
+      }
+      return await api.previewImportFile(file, importSource, importMode)
+    } catch (err) {
+      toast.error('Preview failed: ' + err.message)
+      return null
     }
   }
 
@@ -170,7 +190,15 @@ export default function Settings({ user, adminAvailable = false }) {
   }
 
   const handleRestoreSnapshot = async (snapshot) => {
-    const ok = await openConfirm({ title: 'Restore snapshot?', message: `Restore "${snapshot.name}" using ${importMode} mode?` })
+    let message = `Restore "${snapshot.name}" using ${importMode} mode?`
+    try {
+      const preview = await api.previewSnapshotRestore(snapshot.id, importMode)
+      message = `${message}\nNew links: ${preview.links_new}, existing: ${preview.links_existing}, invalid: ${preview.links_invalid}.`
+      if (preview.replace_deletes_links || preview.replace_deletes_tabs) {
+        message += ` Replace removes ${preview.replace_deletes_links} links and ${preview.replace_deletes_tabs} folders first.`
+      }
+    } catch {}
+    const ok = await openConfirm({ title: 'Restore snapshot?', message })
     if (!ok) return
     try {
       await api.restoreSnapshot(snapshot.id, importMode)
@@ -193,6 +221,46 @@ export default function Settings({ user, adminAvailable = false }) {
       setJobs((items) => [job, ...items])
       toast.success(`${type} ${job.status}`)
     } catch (err) { toast.error(err.message) }
+  }
+
+  const handleCreateApiToken = async () => {
+    if (!newTokenName.trim()) return
+    try {
+      const token = await api.createApiToken({ name: newTokenName.trim() })
+      setApiTokens((items) => [token, ...items])
+      setCreatedToken(token.token)
+      toast.success('API token created')
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const handleRevokeApiToken = async (token) => {
+    try {
+      await api.revokeApiToken(token.id)
+      setApiTokens((items) => items.map((item) => item.id === token.id ? { ...item, revoked_at: new Date().toISOString() } : item))
+      toast.success('API token revoked')
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const handleCopyCreatedToken = async () => {
+    try {
+      await navigator.clipboard.writeText(createdToken)
+      toast.success('Token copied')
+    } catch {
+      toast.error('Clipboard unavailable')
+    }
+  }
+
+  const handleMarkNotificationRead = async (notification) => {
+    try {
+      const updated = await api.markNotificationRead(notification.id)
+      setNotifications((items) => items.map((item) => item.id === updated.id ? updated : item))
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   return (
@@ -259,6 +327,61 @@ export default function Settings({ user, adminAvailable = false }) {
               ))}
             </div>
           )}
+        </Section>
+
+        <Section title="API Tokens">
+          <div className="glass rounded-2xl p-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-accent-500/10 border border-accent-500/20 flex items-center justify-center">
+                <ShieldCheck size={20} className="text-accent-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Personal API access</p>
+                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Use tokens for extensions, CLI scripts, and integrations.</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <input value={newTokenName} onChange={(e) => setNewTokenName(e.target.value)} className="input-base flex-1 rounded-xl px-3 py-2 text-sm outline-none" placeholder="Token name" />
+              <button type="button" onClick={handleCreateApiToken} className="bg-accent-600 text-white px-3 py-2 rounded-xl text-xs font-medium hover:bg-accent-500">Create</button>
+            </div>
+            {createdToken && (
+              <div className="rounded-xl p-3" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.18)' }}>
+                <p className="text-[11px] text-emerald-400 mb-2">Copy this token now. It will not be shown again.</p>
+                <button type="button" onClick={handleCopyCreatedToken} className="w-full text-left font-mono text-[10px] break-all rounded-lg p-2 surface-hover" style={{ color: 'var(--text-secondary)' }}>
+                  <Copy size={12} className="inline mr-1" />{createdToken}
+                </button>
+              </div>
+            )}
+            <div className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+              {apiTokens.map((token) => (
+                <div key={token.id} className="py-2 flex items-center gap-3">
+                  <div className={`h-2 w-2 rounded-full ${token.revoked_at ? 'bg-zinc-500' : 'bg-emerald-400'}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>{token.name}</p>
+                    <p className="metadata-line text-[10px]">{token.token_prefix} · last used {token.last_used_at ? new Date(token.last_used_at).toLocaleString() : 'never'}</p>
+                  </div>
+                  {!token.revoked_at && <button type="button" onClick={() => handleRevokeApiToken(token)} className="text-xs text-red-400 px-2 py-1 rounded-lg hover:bg-red-500/10">Revoke</button>}
+                </div>
+              ))}
+              {apiTokens.length === 0 && <p className="metadata-line text-xs">No API tokens yet</p>}
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Notifications">
+          <div className="glass rounded-2xl divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+            {notifications.slice(0, 6).map((item) => (
+              <button key={item.id} type="button" onClick={() => handleMarkNotificationRead(item)} className="w-full px-4 py-3 flex items-center gap-3 text-left surface-hover">
+                <Bell size={16} style={{ color: item.read_at ? 'var(--text-muted)' : 'var(--accent-primary)' }} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>{item.title}</p>
+                  <p className="metadata-line text-[10px] truncate">{item.body || item.type} · {new Date(item.created_at).toLocaleString()}</p>
+                </div>
+                {!item.read_at && <span className="h-2 w-2 rounded-full bg-accent-400" />}
+              </button>
+            ))}
+            {notifications.length === 0 && <div className="px-4 py-3 metadata-line text-xs">No notifications</div>}
+          </div>
         </Section>
 
         <Section title="Appearance">
@@ -411,6 +534,7 @@ export default function Settings({ user, adminAvailable = false }) {
         mode={importMode}
         setMode={setImportMode}
         onImport={handleImport}
+        onPreview={handlePreviewImport}
         busy={importBusy}
       />
     </div>

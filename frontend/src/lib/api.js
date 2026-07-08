@@ -151,21 +151,33 @@ export const api = {
     if (params.tab_id != null) q.set('tab_id', params.tab_id)
     if (params.favorite != null) q.set('favorite', params.favorite)
     if (params.pinned != null) q.set('pinned', params.pinned)
+    if (params.read != null) q.set('read', params.read)
+    if (params.priority) q.set('priority', params.priority)
     if (params.ungrouped) q.set('ungrouped', 'true')
+    if (params.deleted_only) q.set('deleted_only', 'true')
+    if (params.include_deleted) q.set('include_deleted', 'true')
+    if (params.limit) q.set('limit', params.limit)
+    if (params.offset) q.set('offset', params.offset)
     if (params.q) q.set('q', params.q)
     const qs = q.toString()
     return request(`/links${qs ? `?${qs}` : ''}`)
   },
+  getLinkDetail: (id) => request(`/links/${id}`),
   createLink: (data) => request('/links', { method: 'POST', body: data }),
   updateLink: (id, data) => request(`/links/${id}`, { method: 'PUT', body: data }),
   deleteLink: (id) => request(`/links/${id}`, { method: 'DELETE' }),
+  listTrash: () => request('/links/trash'),
+  restoreLink: (id) => request(`/links/${id}/restore`, { method: 'POST' }),
+  destroyLink: (id) => request(`/links/${id}/destroy`, { method: 'DELETE' }),
   toggleFavorite: (id) => request(`/links/${id}/toggle-favorite`, { method: 'POST' }),
   togglePin: (id) => request(`/links/${id}/toggle-pin`, { method: 'POST' }),
   reorderLinks: (items) => request('/links/reorder', { method: 'POST', body: items }),
-  bulkAction: (linkIds, action, tabId = null) =>
-    request('/links/bulk', { method: 'POST', body: { link_ids: linkIds, action, tab_id: tabId } }),
+  bulkAction: (linkIds, action, tabId = null, extra = {}) =>
+    request('/links/bulk', { method: 'POST', body: { link_ids: linkIds, action, tab_id: tabId, ...extra } }),
   createHighlight: (linkId, data) => request(`/links/${linkId}/highlights`, { method: 'POST', body: data }),
   listHighlights: (linkId) => request(`/links/${linkId}/highlights`),
+  createAttachment: (linkId, data) => request(`/links/${linkId}/attachments`, { method: 'POST', body: data }),
+  getAttachment: (linkId, attachmentId) => request(`/links/${linkId}/attachments/${attachmentId}`),
   archiveLink: (linkId) => request(`/links/${linkId}/archive`, { method: 'POST' }),
   listArchives: (linkId) => request(`/links/${linkId}/archives`),
   getArchive: (archiveId) => request(`/archives/${archiveId}`),
@@ -183,17 +195,31 @@ export const api = {
     request('/settings/username', { method: 'PUT', body: { new_username: newUsername } }),
   exportData: () => request('/settings/export'),
   backupData: () => request('/settings/backup'),
+  previewImportData: (data, mode = 'merge') => request(`/settings/import/preview?mode=${encodeURIComponent(mode)}`, { method: 'POST', body: data }),
   importData: (data, mode = 'merge') => request(`/settings/import?mode=${encodeURIComponent(mode)}`, { method: 'POST', body: data }),
+  previewRestoreData: (data, mode = 'replace') => request(`/settings/restore/preview?mode=${encodeURIComponent(mode)}`, { method: 'POST', body: data }),
   restoreData: (data, mode = 'replace') => request(`/settings/restore?mode=${encodeURIComponent(mode)}`, { method: 'POST', body: data }),
   deleteAccount: () => request('/settings/account', { method: 'DELETE' }),
   createBotToken: () => request('/settings/bot-token', { method: 'POST' }),
+  listApiTokens: () => request('/settings/api-tokens'),
+  createApiToken: (data) => request('/settings/api-tokens', { method: 'POST', body: data }),
+  revokeApiToken: (id) => request(`/settings/api-tokens/${id}`, { method: 'DELETE' }),
+  listNotifications: () => request('/settings/notifications'),
+  markNotificationRead: (id) => request(`/settings/notifications/${id}/read`, { method: 'POST' }),
+  clearNotifications: () => request('/settings/notifications', { method: 'DELETE' }),
   importFile: (file, source, mode = 'merge') => {
     const form = new FormData()
     form.append('file', file)
     return request(`/settings/import-file?source=${encodeURIComponent(source)}&mode=${encodeURIComponent(mode)}`, { method: 'POST', body: form })
   },
+  previewImportFile: (file, source, mode = 'merge') => {
+    const form = new FormData()
+    form.append('file', file)
+    return request(`/settings/import-file/preview?source=${encodeURIComponent(source)}&mode=${encodeURIComponent(mode)}`, { method: 'POST', body: form })
+  },
   listSnapshots: () => request('/settings/snapshots'),
   createSnapshot: (name = null) => request('/settings/snapshots', { method: 'POST', body: { name } }),
+  previewSnapshotRestore: (id, mode = 'replace') => request(`/settings/snapshots/${id}/preview?mode=${encodeURIComponent(mode)}`),
   restoreSnapshot: (id, mode = 'replace') => request(`/settings/snapshots/${id}/restore?mode=${encodeURIComponent(mode)}`, { method: 'POST' }),
   deleteSnapshot: (id) => request(`/settings/snapshots/${id}`, { method: 'DELETE' }),
 
@@ -217,6 +243,7 @@ export const api = {
 
   // Admin
   adminOverview: () => request('/admin/overview'),
+  adminHealth: () => request('/admin/health'),
   adminUsers: () => request('/admin/users'),
   adminJobs: () => request('/admin/jobs'),
 

@@ -1,4 +1,4 @@
-import { Star, DotsThreeVertical, Trash, PencilSimple, PushPin, PushPinSlash, NotePencil, Check, ArrowUpRight, GlobeHemisphereWest, Archive, BookOpen } from '@phosphor-icons/react'
+import { Star, DotsThreeVertical, Trash, PencilSimple, PushPin, PushPinSlash, NotePencil, Check, ArrowUpRight, GlobeHemisphereWest, Archive, BookOpen, Info } from '@phosphor-icons/react'
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -21,7 +21,7 @@ function ArchiveStatusBadge({ link }) {
   )
 }
 
-export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTogglePin, onArchive, onViewArchive, onSelect, selected, selectionMode }) {
+export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTogglePin, onArchive, onViewArchive, onDetails, onSelect, selected, selectionMode }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [showNote, setShowNote] = useState(false)
   const longPressTimer = useRef(null)
@@ -171,6 +171,11 @@ export default function LinkGridCard({ link, onEdit, onDelete, onToggleFav, onTo
               className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
             >
               <PencilSimple size={13} /> Edit
+            </button>
+            <button onClick={() => { onDetails?.(link); setMenuOpen(false) }}
+              className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
+            >
+              <Info size={13} /> Details
             </button>
             <button onClick={() => { window.open(`https://web.archive.org/web/${encodeURIComponent(link.url)}`, '_blank'); setMenuOpen(false) }}
               className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}

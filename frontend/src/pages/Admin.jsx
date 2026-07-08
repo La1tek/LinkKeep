@@ -4,13 +4,14 @@ import { api } from '../lib/api'
 
 export default function Admin() {
   const [overview, setOverview] = useState(null)
+  const [health, setHealth] = useState(null)
   const [users, setUsers] = useState([])
   const [jobs, setJobs] = useState([])
   const [error, setError] = useState('')
 
   useEffect(() => {
-    Promise.all([api.adminOverview(), api.adminUsers(), api.adminJobs()])
-      .then(([o, u, j]) => { setOverview(o); setUsers(u.users || []); setJobs(j.jobs || []) })
+    Promise.all([api.adminOverview(), api.adminHealth(), api.adminUsers(), api.adminJobs()])
+      .then(([o, h, u, j]) => { setOverview(o); setHealth(h); setUsers(u.users || []); setJobs(j.jobs || []) })
       .catch((err) => setError(err.message))
   }, [])
 
@@ -23,10 +24,26 @@ export default function Admin() {
         {error && <div className="glass rounded-xl p-4 text-sm text-red-400">{error}</div>}
         {overview && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {Object.entries({ users: overview.users, links: overview.links, tabs: overview.tabs, snapshots: overview.snapshots, sessions: overview.sessions }).map(([label, value]) => (
+            {Object.entries({ users: overview.users, active_links: overview.active_links, trash: overview.trashed_links, tokens: overview.api_tokens, sessions: overview.sessions }).map(([label, value]) => (
               <div key={label} className="glass rounded-xl p-4"><p className="text-xs uppercase" style={{ color: 'var(--text-muted)' }}>{label}</p><p className="text-2xl font-semibold">{value}</p></div>
             ))}
           </div>
+        )}
+        {health && (
+          <section className="glass rounded-xl p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>System health</h2>
+                <p className="metadata-line text-[11px]">Jobs, archive failures, and trash pressure.</p>
+              </div>
+              <span className={`text-xs px-2 py-1 rounded-lg ${health.ok ? 'text-emerald-400' : 'text-red-400'}`}>{health.ok ? 'OK' : 'Needs attention'}</span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+              {Object.entries({ failed_jobs: health.failed_jobs, queued_jobs: health.queued_jobs, failed_archives: health.failed_archives, trash: health.trash }).map(([label, value]) => (
+                <div key={label} className="surface rounded-xl p-3"><p className="metadata-line text-[10px] uppercase">{label}</p><p className="text-xl font-semibold">{value}</p></div>
+              ))}
+            </div>
+          </section>
         )}
         <section className="glass rounded-xl overflow-hidden">
           <h2 className="px-4 py-3 text-sm font-semibold border-b" style={{ borderColor: 'var(--border-subtle)' }}>Users</h2>

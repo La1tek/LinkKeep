@@ -17,6 +17,7 @@ import { openConfirm } from '../components/ConfirmModal'
 import AnimatedCounter from '../components/AnimatedCounter'
 import ArchiveModal from '../components/ArchiveModal'
 import FolderLockModal from '../components/FolderLockModal'
+import LinkDetailModal from '../components/LinkDetailModal'
 
 const staggerContainer = {
   hidden: {},
@@ -29,6 +30,10 @@ const staggerItem = {
 }
 
 const LINKKEEP_LINKS_MIME = 'application/x-linkkeep-links'
+
+function readFolderPreference(folderId, key, fallback) {
+  try { return localStorage.getItem(`lk_folder_pref:${folderId}:${key}`) || fallback } catch { return fallback }
+}
 
 function createDragPreview({ count, title }) {
   const node = document.createElement('div')
@@ -81,8 +86,8 @@ export default function Folder({ token }) {
   const navigate = useNavigate()
   const { tabs, create: createTab, refresh: refreshTabs } = useTabStore()
   const [search, setSearch] = useState('')
-  const [sortBy, setSortBy] = useState('newest')
-  const [activeTag, setActiveTag] = useState(null)
+  const [sortBy, setSortBy] = useState(() => readFolderPreference(id, 'sort', 'newest'))
+  const [activeTag, setActiveTag] = useState(() => readFolderPreference(id, 'tag', '') || null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingLink, setEditingLink] = useState(null)
   const [selectionMode, setSelectionMode] = useState(false)
@@ -104,12 +109,29 @@ export default function Folder({ token }) {
   const [dragOverLinkId, setDragOverLinkId] = useState(null)
   const [dropFolderId, setDropFolderId] = useState(null)
   const [archiveLink, setArchiveLink] = useState(null)
+  const [detailLink, setDetailLink] = useState(null)
   const [folderLockModal, setFolderLockModal] = useState(null)
   const touchStartY = useRef(0)
   const toast = useToast()
-  const { mode: viewMode, toggle: toggleViewMode } = useViewMode()
+  const { mode: viewMode, toggle: toggleViewMode } = useViewMode(`folder:${id}`)
 
   const safeTabs = tabs || []
+
+  useEffect(() => {
+    setSortBy(readFolderPreference(id, 'sort', 'newest'))
+    setActiveTag(readFolderPreference(id, 'tag', '') || null)
+  }, [id])
+
+  useEffect(() => {
+    try { localStorage.setItem(`lk_folder_pref:${id}:sort`, sortBy) } catch {}
+  }, [id, sortBy])
+
+  useEffect(() => {
+    try {
+      if (activeTag) localStorage.setItem(`lk_folder_pref:${id}:tag`, activeTag)
+      else localStorage.removeItem(`lk_folder_pref:${id}:tag`)
+    } catch {}
+  }, [id, activeTag])
 
   // Determine if "all" or specific folder
   const isAll = id === 'all'
@@ -201,8 +223,8 @@ export default function Folder({ token }) {
     if (!ok) return
     await deleteLink(link.id)
     toast.success('Link deleted', 2500, { action: 'Undo', onAction: async () => {
-      const { id, ...data } = link
-      await createLink(data); refresh()
+      await api.restoreLink(link.id)
+      refresh()
       toast.success('Link restored')
     }})
     refreshTabs()
@@ -290,6 +312,47 @@ export default function Folder({ token }) {
     setSelectedIds([]); setSelectionMode(false)
     refresh(); refreshTabs()
     toast.success('Links moved')
+  }
+
+  const handleBulkSimple = async (action, extra = {}) => {
+    if (!selectedIds.length) return
+    try {
+      await api.bulkAction(selectedIds, action, null, extra)
+      refresh()
+      toast.success(`${selectedIds.length} links updated`)
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const handleBulkArchive = async () => {
+    if (!selectedIds.length) return
+    try {
+      for (const linkId of selectedIds) await api.archiveLink(linkId)
+      refresh()
+      toast.success(`${selectedIds.length} archive jobs started`)
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const handleBulkExport = () => {
+    const selected = rawLinks.filter((link) => selectedIds.includes(link.id))
+    const blob = new Blob([JSON.stringify({ links: selected }, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `linkatlas-selection-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Selection exported')
+  }
+
+  const handleBulkAddTags = async () => {
+    const raw = prompt('Tags to add, comma separated:')
+    const tags = raw?.split(',').map((item) => item.trim()).filter(Boolean) || []
+    if (!tags.length) return
+    await handleBulkSimple('add_tags', { tags })
   }
 
   const handleDropLinksToTab = async ({ linkIds, tabId, tabName }) => {
@@ -521,6 +584,7 @@ export default function Folder({ token }) {
         onTogglePin={handleTogglePin}
         onArchive={handleArchiveLink}
         onViewArchive={(link) => setArchiveLink(link)}
+        onDetails={(link) => setDetailLink(link)}
       />
     </motion.div>
   )
@@ -545,6 +609,7 @@ export default function Folder({ token }) {
         onTogglePin={handleTogglePin}
         onArchive={handleArchiveLink}
         onViewArchive={(link) => setArchiveLink(link)}
+        onDetails={(link) => setDetailLink(link)}
       />
     </motion.div>
   )
@@ -660,11 +725,19 @@ export default function Folder({ token }) {
           >
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{selectedIds.length} selected</span>
             <div className="h-4 w-px" style={{ background: 'var(--border-subtle)' }} />
+            <button onClick={() => setSelectedIds(processedLinks.map((link) => link.id))} className="text-xs text-accent-400 hover:text-accent-300">Select all</button>
             <select onChange={(e) => { if (e.target.value) handleBulkMove(Number(e.target.value)); e.target.value = '' }}
               className="text-xs bg-transparent outline-none cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
               <option value="">Move to...</option>
               {safeTabs.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
+            <button onClick={() => handleBulkSimple('read')} className="text-xs text-accent-400 hover:text-accent-300">Read</button>
+            <button onClick={() => handleBulkSimple('unread')} className="text-xs text-accent-400 hover:text-accent-300">Unread</button>
+            <button onClick={() => handleBulkSimple('favorite')} className="text-xs text-accent-400 hover:text-accent-300">Star</button>
+            <button onClick={() => handleBulkSimple('pin')} className="text-xs text-accent-400 hover:text-accent-300">Pin</button>
+            <button onClick={handleBulkAddTags} className="text-xs text-accent-400 hover:text-accent-300">Tags</button>
+            <button onClick={handleBulkArchive} className="text-xs text-accent-400 hover:text-accent-300">Archive</button>
+            <button onClick={handleBulkExport} className="text-xs text-accent-400 hover:text-accent-300">Export</button>
             <button onClick={handleBulkDelete} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"><Trash size={13} /> Delete</button>
             <button onClick={() => { setSelectionMode(false); setSelectedIds([]) }} style={{ color: 'var(--text-muted)' }}><X size={14} /></button>
           </motion.div>
@@ -800,6 +873,13 @@ export default function Folder({ token }) {
         link={archiveLink}
         onClose={() => setArchiveLink(null)}
         onArchiveCreated={() => refresh()}
+      />
+      <LinkDetailModal
+        open={!!detailLink}
+        link={detailLink}
+        onClose={() => setDetailLink(null)}
+        onUpdated={() => refresh()}
+        toast={toast}
       />
       <FolderLockModal
         open={!!folderLockModal}

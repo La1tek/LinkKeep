@@ -2,16 +2,24 @@ import { useState, useEffect } from 'react'
 
 const VIEW_MODE_KEY = 'lk_view_mode'
 
-function getInitial() {
-  try { return localStorage.getItem(VIEW_MODE_KEY) || 'list' } catch { return 'list' }
+function getKey(scope) {
+  return scope ? `${VIEW_MODE_KEY}:${scope}` : VIEW_MODE_KEY
 }
 
-export function useViewMode() {
-  const [mode, setMode] = useState(getInitial)
+function getInitial(scope) {
+  try { return localStorage.getItem(getKey(scope)) || localStorage.getItem(VIEW_MODE_KEY) || 'list' } catch { return 'list' }
+}
+
+export function useViewMode(scope = '') {
+  const [mode, setMode] = useState(() => getInitial(scope))
 
   useEffect(() => {
-    localStorage.setItem(VIEW_MODE_KEY, mode)
-  }, [mode])
+    setMode(getInitial(scope))
+  }, [scope])
+
+  useEffect(() => {
+    localStorage.setItem(getKey(scope), mode)
+  }, [mode, scope])
 
   const toggle = () => setMode(prev => prev === 'list' ? 'grid' : 'list')
 

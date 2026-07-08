@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Plus, X, GearSix, SignOut, Star, Stack, CaretDown, CaretRight, Link as LinkIcon, Sparkle, ShieldCheck, LockKey, ArrowSquareIn } from '@phosphor-icons/react'
+import { Plus, X, GearSix, SignOut, Star, Stack, CaretDown, CaretRight, Link as LinkIcon, Sparkle, ShieldCheck, LockKey, ArrowSquareIn, Trash } from '@phosphor-icons/react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AnimatedCounter from './AnimatedCounter'
@@ -71,6 +71,7 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
   const isFavActive = activePath === '/favorites'
   const isSharesActive = activePath === '/shares'
   const isRecommendationsActive = activePath === '/recommendations'
+  const isTrashActive = activePath === '/trash'
   const isAdminActive = activePath === '/admin'
   const allLinksCount = safeTabs.reduce((sum, tab) => sum + Number(tab.link_count || 0), 0)
   const protectedCount = safeTabs.filter(tab => tab.is_locked).length
@@ -308,6 +309,18 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
         >
           <Sparkle size={16} />
           <span>Recommendations</span>
+        </motion.button>
+
+        <motion.button
+          layout
+          onClick={() => navigate('/trash')}
+          className={`atlas-nav-item atlas-system-row w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${isTrashActive ? 'is-active' : ''}`}
+          style={{
+            color: isTrashActive ? '#ef4444' : 'var(--text-tertiary)',
+          }}
+        >
+          <Trash size={16} />
+          <span>Trash</span>
         </motion.button>
 
         {adminAvailable && (

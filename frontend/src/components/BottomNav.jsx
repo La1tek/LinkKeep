@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion'
-import { House, Star, MagnifyingGlass, GearSix } from '@phosphor-icons/react'
+import { House, Star, MagnifyingGlass, GearSix, Trash } from '@phosphor-icons/react'
 
 const navItems = [
   { path: '/', label: 'Home', icon: House },
   { path: '/favorites', label: 'Saved', icon: Star },
   { path: '/search', label: 'Search', icon: MagnifyingGlass },
+  { path: '/trash', label: 'Trash', icon: Trash },
   { path: '/settings', label: 'Settings', icon: GearSix },
 ]
 

@@ -19,22 +19,36 @@ export function getImportSourceLabel(value) {
   return IMPORT_SOURCES.find((source) => source.value === value)?.label || 'Import'
 }
 
-export default function QuickImportModal({ open, onClose, source, setSource, mode, setMode, onImport, busy }) {
+export default function QuickImportModal({ open, onClose, source, setSource, mode, setMode, onImport, onPreview, busy }) {
   const inputRef = useRef(null)
   const [file, setFile] = useState(null)
   const [dragActive, setDragActive] = useState(false)
+  const [preview, setPreview] = useState(null)
+  const [previewBusy, setPreviewBusy] = useState(false)
   const selectedSource = IMPORT_SOURCES.find((item) => item.value === source) || IMPORT_SOURCES[0]
 
   useEffect(() => {
     if (!open) {
       setFile(null)
       setDragActive(false)
+      setPreview(null)
     }
   }, [open])
 
   const handleFiles = (files) => {
     const nextFile = files?.[0]
-    if (nextFile) setFile(nextFile)
+    if (nextFile) {
+      setFile(nextFile)
+      setPreview(null)
+    }
+  }
+
+  const handlePreview = async () => {
+    if (!file || !onPreview || previewBusy) return
+    setPreviewBusy(true)
+    const result = await onPreview(file)
+    if (result) setPreview(result)
+    setPreviewBusy(false)
   }
 
   const handleSubmit = async () => {
@@ -103,6 +117,27 @@ export default function QuickImportModal({ open, onClose, source, setSource, mod
                 </label>
               </div>
 
+              {preview && (
+                <div className="rounded-2xl p-3 grid grid-cols-2 gap-2" style={{ background: 'rgba(124,140,255,0.08)', border: '1px solid rgba(124,140,255,0.18)' }}>
+                  {[
+                    ['New links', preview.links_new],
+                    ['Existing', preview.links_existing],
+                    ['Invalid', preview.links_invalid],
+                    ['New folders', preview.tabs_new],
+                  ].map(([label, value]) => (
+                    <div key={label}>
+                      <div className="metadata-line text-[10px] uppercase">{label}</div>
+                      <div className="text-lg font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>{value || 0}</div>
+                    </div>
+                  ))}
+                  {(preview.replace_deletes_links || preview.replace_deletes_tabs) ? (
+                    <div className="col-span-2 text-[11px] text-red-400">
+                      Replace will remove {preview.replace_deletes_links || 0} links and {preview.replace_deletes_tabs || 0} folders first.
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
@@ -136,6 +171,15 @@ export default function QuickImportModal({ open, onClose, source, setSource, mod
               />
 
               <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handlePreview}
+                  disabled={!file || busy || previewBusy || !onPreview}
+                  className="glass px-4 py-2.5 rounded-xl text-sm surface-hover disabled:opacity-40"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  {previewBusy ? 'Checking...' : 'Preview'}
+                </button>
                 <button
                   type="button"
                   onClick={handleSubmit}

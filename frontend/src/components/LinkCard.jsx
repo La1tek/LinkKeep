@@ -1,4 +1,4 @@
-import { Star, DotsThreeVertical, ArrowUpRight, Trash, PencilSimple, PushPin, PushPinSlash, NotePencil, Check, GlobeHemisphereWest, BookOpen, Archive } from '@phosphor-icons/react'
+import { Star, DotsThreeVertical, ArrowUpRight, Trash, PencilSimple, PushPin, PushPinSlash, NotePencil, Check, GlobeHemisphereWest, BookOpen, Archive, Info } from '@phosphor-icons/react'
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -96,7 +96,7 @@ function ArchiveStatusBadge({ link }) {
   )
 }
 
-export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onTogglePin, onArchive, onViewArchive, onSelect, selected, selectionMode, index = 0 }) {
+export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onTogglePin, onArchive, onViewArchive, onDetails, onSelect, selected, selectionMode, index = 0 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [showNote, setShowNote] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
@@ -249,6 +249,11 @@ export default function LinkCard({ link, onEdit, onDelete, onToggleFav, onToggle
                     className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
                   >
                     <PencilSimple size={13} /> Edit
+                  </button>
+                  <button onClick={() => { onDetails?.(link); setMenuOpen(false) }}
+                    className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}
+                  >
+                    <Info size={13} /> Details
                   </button>
                   <button onClick={() => { onTogglePin?.(link); setMenuOpen(false) }}
                     className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}

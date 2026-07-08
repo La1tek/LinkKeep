@@ -13,8 +13,188 @@ async function mockAuthedApi(page, { tabs = [], links = [] } = {}) {
   await page.route('**/api/tabs', async (route) => {
     await route.fulfill({ json: tabs })
   })
+  await page.route('**/api/links/trash', async (route) => {
+    await route.fulfill({
+      json: [
+        {
+          id: 99,
+          title: 'Deleted resource',
+          url: 'https://deleted.example.com',
+          tags: [],
+          is_favorite: false,
+          is_pinned: false,
+          is_read: false,
+          priority: 'normal',
+          sort_order: 0,
+          created_at: '2026-07-07T00:00:00Z',
+          updated_at: '2026-07-07T00:00:00Z',
+          deleted_at: '2026-07-08T00:00:00Z',
+        },
+      ],
+    })
+  })
+  await page.route('**/api/links/*/restore', async (route) => {
+    await route.fulfill({ json: { id: 99, title: 'Deleted resource', url: 'https://deleted.example.com', deleted_at: null } })
+  })
+  await page.route('**/api/links/*/destroy', async (route) => {
+    await route.fulfill({ status: 204, body: '' })
+  })
+  await page.route('**/api/links/*/attachments/**', async (route) => {
+    await route.fulfill({ json: { id: 1, filename: 'note.txt', data_url: 'data:text/plain;base64,SGVsbG8=' } })
+  })
+  await page.route('**/api/links/*', async (route) => {
+    const method = route.request().method()
+    if (method === 'GET') {
+      await route.fulfill({
+        json: {
+          link: links[0] || {
+            id: 1,
+            title: 'Detail link',
+            url: 'https://detail.example.com',
+            tags: [],
+            is_favorite: false,
+            is_pinned: false,
+            is_read: false,
+            priority: 'normal',
+            sort_order: 0,
+            created_at: '2026-07-07T00:00:00Z',
+            updated_at: '2026-07-07T00:00:00Z',
+          },
+          history: [{ id: 1, action: 'created', changes: {}, created_at: '2026-07-07T00:00:00Z' }],
+          archives: [],
+          highlights: [],
+          attachments: [],
+        },
+      })
+      return
+    }
+    await route.fulfill({ json: links[0] || {} })
+  })
   await page.route('**/api/links**', async (route) => {
+    const url = route.request().url()
+    const method = route.request().method()
+    if (url.includes('/api/links/trash')) {
+      await route.fulfill({
+        json: [
+          {
+            id: 99,
+            title: 'Deleted resource',
+            url: 'https://deleted.example.com',
+            tags: [],
+            is_favorite: false,
+            is_pinned: false,
+            is_read: false,
+            priority: 'normal',
+            sort_order: 0,
+            created_at: '2026-07-07T00:00:00Z',
+            updated_at: '2026-07-07T00:00:00Z',
+            deleted_at: '2026-07-08T00:00:00Z',
+          },
+        ],
+      })
+      return
+    }
+    if (url.includes('/restore')) {
+      await route.fulfill({ json: { id: 99, title: 'Deleted resource', url: 'https://deleted.example.com', deleted_at: null } })
+      return
+    }
+    if (url.includes('/destroy')) {
+      await route.fulfill({ status: 204, body: '' })
+      return
+    }
+    if (method === 'GET' && /\/api\/links\/\d+$/.test(new URL(url).pathname)) {
+      await route.fulfill({
+        json: {
+          link: links[0] || {
+            id: 1,
+            title: 'Detail link',
+            url: 'https://detail.example.com',
+            tags: [],
+            is_favorite: false,
+            is_pinned: false,
+            is_read: false,
+            priority: 'normal',
+            sort_order: 0,
+            created_at: '2026-07-07T00:00:00Z',
+            updated_at: '2026-07-07T00:00:00Z',
+          },
+          history: [{ id: 1, action: 'created', changes: {}, created_at: '2026-07-07T00:00:00Z' }],
+          archives: [],
+          highlights: [],
+          attachments: [],
+        },
+      })
+      return
+    }
     await route.fulfill({ json: links })
+  })
+  await page.route('**/api/links/**', async (route) => {
+    const url = route.request().url()
+    const method = route.request().method()
+    if (url.includes('/api/links/trash')) {
+      await route.fulfill({
+        json: [
+          {
+            id: 99,
+            title: 'Deleted resource',
+            url: 'https://deleted.example.com',
+            tags: [],
+            is_favorite: false,
+            is_pinned: false,
+            is_read: false,
+            priority: 'normal',
+            sort_order: 0,
+            created_at: '2026-07-07T00:00:00Z',
+            updated_at: '2026-07-07T00:00:00Z',
+            deleted_at: '2026-07-08T00:00:00Z',
+          },
+        ],
+      })
+      return
+    }
+    if (url.includes('/restore')) {
+      await route.fulfill({ json: { id: 99, title: 'Deleted resource', url: 'https://deleted.example.com', deleted_at: null } })
+      return
+    }
+    if (url.includes('/destroy')) {
+      await route.fulfill({ status: 204, body: '' })
+      return
+    }
+    if (url.includes('/archive')) {
+      await route.fulfill({ status: 201, json: { id: 1, status: 'succeeded' } })
+      return
+    }
+    if (method === 'GET') {
+      await route.fulfill({
+        json: {
+          link: links[0] || {
+            id: 1,
+            title: 'Detail link',
+            url: 'https://detail.example.com',
+            tags: [],
+            is_favorite: false,
+            is_pinned: false,
+            is_read: false,
+            priority: 'normal',
+            sort_order: 0,
+            created_at: '2026-07-07T00:00:00Z',
+            updated_at: '2026-07-07T00:00:00Z',
+          },
+          history: [{ id: 1, action: 'created', changes: {}, created_at: '2026-07-07T00:00:00Z' }],
+          archives: [],
+          highlights: [],
+          attachments: [],
+        },
+      })
+      return
+    }
+    await route.fulfill({ json: links[0] || {} })
+  })
+  await page.route('**/api/links/**/restore', async (route) => {
+    await route.fulfill({ json: { id: 99, title: 'Deleted resource', url: 'https://deleted.example.com', deleted_at: null } })
+  })
+  await page.route('**/api/links/bulk', async (route) => {
+    await route.fulfill({ json: { affected: 1, action: 'restore' } })
   })
   await page.route('**/api/stats', async (route) => {
     await route.fulfill({ json: { total_links: 0, total_tabs: 0, total_favorites: 0, total_pinned: 0, recent_links: [] } })
@@ -43,10 +223,44 @@ async function mockAuthedApi(page, { tabs = [], links = [] } = {}) {
   await page.route('**/api/settings/snapshots', async (route) => {
     await route.fulfill({ json: { snapshots: [{ id: 1, name: 'Daily', created_at: '2026-07-07T00:00:00Z' }] } })
   })
+  await page.route('**/api/settings/snapshots/*/preview**', async (route) => {
+    await route.fulfill({ json: { mode: 'replace', links_new: 1, links_existing: 0, links_invalid: 0, tabs_new: 0, tabs_existing: 0, replace_deletes_links: 2, replace_deletes_tabs: 1, sample_links: [] } })
+  })
+  await page.route('**/api/settings/api-tokens', async (route) => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({
+        status: 201,
+        json: {
+          id: 2,
+          name: 'Playwright token',
+          token: 'lkat_test_token',
+          token_prefix: 'lkat_test_to',
+          scopes: ['links:read', 'links:write'],
+          created_at: '2026-07-08T00:00:00Z',
+          last_used_at: null,
+          revoked_at: null,
+        },
+      })
+      return
+    }
+    await route.fulfill({ json: [{ id: 1, name: 'Existing token', token_prefix: 'lkat_existing', scopes: [], created_at: '2026-07-07T00:00:00Z', last_used_at: null, revoked_at: null }] })
+  })
+  await page.route('**/api/settings/notifications', async (route) => {
+    await route.fulfill({ json: [{ id: 1, type: 'bulk', title: 'Bulk action complete', body: '2 links processed', payload: {}, read_at: null, created_at: '2026-07-08T00:00:00Z' }] })
+  })
+  await page.route('**/api/settings/import/preview**', async (route) => {
+    await route.fulfill({ json: { mode: 'merge', links_new: 1, links_existing: 1, links_invalid: 0, tabs_new: 0, tabs_existing: 0, replace_deletes_links: 0, replace_deletes_tabs: 0, sample_links: [] } })
+  })
+  await page.route('**/api/settings/import-file/preview**', async (route) => {
+    await route.fulfill({ json: { mode: 'merge', links_new: 1, links_existing: 1, links_invalid: 0, tabs_new: 0, tabs_existing: 0, replace_deletes_links: 0, replace_deletes_tabs: 0, sample_links: [] } })
+  })
   await page.route('**/api/jobs', async (route) => {
     await route.fulfill({ json: { jobs: [{ id: 1, type: 'backup_snapshot', status: 'succeeded', created_at: '2026-07-07T00:00:00Z' }] } })
   })
   await page.route('**/api/admin/overview', async (route) => {
+    await route.fulfill({ status: 403, json: { detail: 'Admin access required' } })
+  })
+  await page.route('**/api/admin/health', async (route) => {
     await route.fulfill({ status: 403, json: { detail: 'Admin access required' } })
   })
 }
@@ -82,8 +296,50 @@ test('shows sessions, quick import and tag management in settings', async ({ pag
   await page.getByRole('button', { name: /quick import/i }).click()
   await expect(page.getByRole('heading', { name: 'Quick Import' })).toBeVisible()
   await expect(page.getByText('Mode', { exact: true })).toBeVisible()
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'links.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ links: [{ title: 'Imported', url: 'https://imported.example.com' }] })),
+  })
+  await page.getByRole('button', { name: 'Preview' }).click()
+  await expect(page.getByText('New links')).toBeVisible()
+  await expect(page.getByText('Existing', { exact: true })).toBeVisible()
   await expect(page.getByText('Daily')).toBeVisible()
   await expect(page.getByText('docs')).toBeVisible()
+})
+
+test('shows API tokens and notifications in settings', async ({ page }) => {
+  await mockAuthedApi(page)
+  await page.addInitScript(() => {
+    window.localStorage.setItem('lk_token', 'test-token')
+    window.localStorage.setItem('lk_user', JSON.stringify({ id: 1, username: 'demo', created_at: '2026-07-07T00:00:00Z' }))
+  })
+
+  await page.goto('/settings')
+
+  await expect(page.getByText('Personal API access')).toBeVisible()
+  await expect(page.getByText('Existing token')).toBeVisible()
+  await expect(page.getByText('Bulk action complete')).toBeVisible()
+  const tokenSection = page.locator('section').filter({ hasText: 'Personal API access' })
+  await tokenSection.getByPlaceholder('Token name').fill('Playwright token')
+  await tokenSection.getByRole('button', { name: 'Create' }).click()
+  await expect(page.getByText('lkat_test_token')).toBeVisible()
+})
+
+test('selects a trashed link for restore', async ({ page }) => {
+  await mockAuthedApi(page)
+  await page.addInitScript(() => {
+    window.localStorage.setItem('lk_token', 'test-token')
+    window.localStorage.setItem('lk_user', JSON.stringify({ id: 1, username: 'demo', created_at: '2026-07-07T00:00:00Z' }))
+  })
+
+  await page.goto('/trash')
+
+  await expect(page).toHaveURL(/\/trash$/)
+  await expect(page.getByText('Deleted resource')).toBeVisible()
+  await page.getByLabel('Select link').click()
+  await expect(page.getByText('1 selected')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Restore selected links' })).toBeVisible()
 })
 
 test('opens a public share without auth', async ({ page }) => {
