@@ -19,7 +19,7 @@ function getFaviconUrl(url) {
   catch { return null }
 }
 
-export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelete, onUnlock, onProtect }) {
+export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelete, onUnlock, onLock, onProtect }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const longPressTimer = useRef(null)
@@ -174,6 +174,15 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
                     style={{ color: 'var(--text-secondary)' }}
                   >
                     <LockKeyOpen size={13} /> Unlock
+                  </button>
+                )}
+                {tab.is_unlocked && (
+                  <button
+                    onClick={() => { onLock?.(tab); setShowMenu(false) }}
+                    className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    <LockKey size={13} /> Lock folder
                   </button>
                 )}
                 <button

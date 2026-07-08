@@ -143,3 +143,37 @@ test('sets folder PIN with four digit inputs', async ({ page }) => {
 
   await expect(page.getByRole('heading', { name: 'Protect folder' })).toHaveCount(0)
 })
+
+test('locks an unlocked protected folder from the folder card menu', async ({ page }) => {
+  await mockAuthedApi(page, {
+    tabs: [
+      {
+        id: 42,
+        name: 'Design System',
+        color: '#7c8cff',
+        parent_id: null,
+        link_count: 3,
+        total_link_count: 3,
+        child_count: 0,
+        is_locked: true,
+        is_unlocked: true,
+      },
+    ],
+  })
+  await page.addInitScript(() => {
+    window.localStorage.setItem('lk_token', 'test-token')
+    window.localStorage.setItem('lk_user', JSON.stringify({ id: 1, username: 'demo', created_at: '2026-07-07T00:00:00Z' }))
+    window.sessionStorage.setItem('lk_folder_unlocks', JSON.stringify({
+      42: { token: 'unlock-token', expires_at: '2099-01-01T00:00:00Z' },
+    }))
+  })
+
+  await page.goto('/')
+
+  await page.getByRole('button', { name: 'Open actions for Design System', exact: true }).click()
+  await page.getByRole('button', { name: 'Lock folder' }).click()
+
+  const unlocks = await page.evaluate(() => JSON.parse(window.sessionStorage.getItem('lk_folder_unlocks') || '{}'))
+  expect(unlocks['42']).toBeUndefined()
+  await expect(page.getByText('Folder locked')).toBeVisible()
+})

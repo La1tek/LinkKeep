@@ -128,6 +128,14 @@ export default function App() {
     }
   }
 
+  const handleLockTab = async (tab) => {
+    if (!tab?.id) return
+    api.clearFolderUnlock(tab.id)
+    await refreshTabs()
+    window.dispatchEvent(new CustomEvent('linkkeep-folder-locked', { detail: { tabId: tab.id } }))
+    toast.success('Folder locked')
+  }
+
   return (
     <div className="cosmos-shell flex min-h-[100dvh]" style={{ color: 'var(--text-primary)' }}>
       <div className="animated-sky" aria-hidden="true">
@@ -145,6 +153,7 @@ export default function App() {
         onCreateTab={createTab}
         onDeleteTab={handleDeleteTab}
         onUnlockTab={(tab) => setFolderLockModal({ tab, mode: 'unlock' })}
+        onLockTab={handleLockTab}
         onDropLinks={handleDropLinks}
         onLogout={logout}
       />

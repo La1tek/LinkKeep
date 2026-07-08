@@ -175,6 +175,17 @@ export default function Folder({ token }) {
   const headerTitle = isAll ? 'All Links' : (currentTab ? currentTab.name : 'Folder')
   const accentColor = isAll ? '#6366f1' : (currentTab?.color || '#6366f1')
   const lockedCurrentFolder = !isAll && currentTab?.is_locked && !currentTab?.is_unlocked
+  const unlockedProtectedFolder = !isAll && currentTab?.is_locked && currentTab?.is_unlocked
+
+  const handleLockCurrentFolder = async () => {
+    if (!currentTab?.id) return
+    api.clearFolderUnlock(currentTab.id)
+    setMenuOpen(false)
+    setSelectedIds([])
+    setSelectionMode(false)
+    await refreshTabs()
+    toast.success('Folder locked')
+  }
 
   const handleAddLink = async (data) => {
     try {
@@ -588,6 +599,11 @@ export default function Folder({ token }) {
               <button onClick={handleCheckHealth} disabled={healthChecking} className="hidden sm:block p-2 rounded-xl transition-colors surface-hover" style={{ color: healthChecking ? 'var(--text-muted)' : healthResult?.dead > 0 ? '#ef4444' : 'var(--text-muted)' }} title="Check link health">
                 <span className={`text-[10px] font-bold ${healthChecking ? 'animate-pulse' : ''}`}>{healthChecking ? '...' : healthResult ? `${healthResult.dead}⚡` : '⚡'}</span>
               </button>
+              {unlockedProtectedFolder && (
+                <button onClick={handleLockCurrentFolder} className="p-2 rounded-xl transition-colors surface-hover" style={{ color: 'var(--text-muted)' }} title="Lock folder" aria-label="Lock folder">
+                  <LockKey size={16} weight="fill" />
+                </button>
+              )}
               {/* Create subfolder button (not in All Links) */}
               {!isAll && (
                 <button onClick={() => lockedCurrentFolder ? setFolderLockModal({ tab: currentTab, mode: 'unlock' }) : setNewSubOpen(true)} className="p-2 rounded-xl transition-colors surface-hover" style={{ color: 'var(--text-muted)' }} title="Create subfolder">
@@ -604,6 +620,9 @@ export default function Folder({ token }) {
                   <AnimatePresence>
                     {menuOpen && (
                       <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} className="absolute right-0 top-full mt-1 z-20 glass rounded-2xl py-1 min-w-[140px] shadow-xl">
+                        {unlockedProtectedFolder && (
+                          <button onClick={handleLockCurrentFolder} className="w-full px-3 py-2 text-left text-xs surface-hover flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}><LockKey size={13} weight="fill" /> Lock folder</button>
+                        )}
                         <button onClick={handleDeleteFolder} className="w-full px-3 py-2 text-left text-xs hover:bg-red-500/10 flex items-center gap-2 text-red-400"><Trash size={13} /> Delete folder</button>
                       </motion.div>
                     )}

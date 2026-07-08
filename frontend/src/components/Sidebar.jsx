@@ -25,7 +25,7 @@ function hasDraggedLinks(event) {
   return Array.from(event.dataTransfer?.types || []).includes(LINKKEEP_LINKS_MIME)
 }
 
-export default function Sidebar({ tabs, activePath, adminAvailable = false, onSelectTab, onSelectAll, onSelectFavorites, onCreateTab, onDeleteTab, onUnlockTab, onDropLinks, onLogout }) {
+export default function Sidebar({ tabs, activePath, adminAvailable = false, onSelectTab, onSelectAll, onSelectFavorites, onCreateTab, onDeleteTab, onUnlockTab, onLockTab, onDropLinks, onLogout }) {
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState('#6366f1')
@@ -71,6 +71,8 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
   const isSharesActive = activePath === '/shares'
   const isRecommendationsActive = activePath === '/recommendations'
   const isAdminActive = activePath === '/admin'
+  const allLinksCount = safeTabs.reduce((sum, tab) => sum + Number(tab.link_count || 0), 0)
+  const protectedCount = safeTabs.filter(tab => tab.is_locked).length
 
   // Build tree: root tabs (no parent) and children
   const rootTabs = safeTabs.filter(t => !t.parent_id)
@@ -85,6 +87,7 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
   const renderTab = (tab, depth = 0) => {
     const children = childrenMap[tab.id] || []
     const locked = tab.is_locked && !tab.is_unlocked
+    const unlockedProtected = tab.is_locked && tab.is_unlocked
     const hasChildren = children.length > 0 && !locked
     const isExpanded = expandedIds.has(tab.id)
     const active = isActive(tab.id)
@@ -123,7 +126,8 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
     return (
       <div key={tab.id}>
         <div
-          className="group relative flex items-center"
+          className="atlas-tree-node group relative flex items-center"
+          style={{ paddingLeft: `${depth * 16}px` }}
           onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -133,9 +137,8 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
             layout
             onClick={() => locked ? onUnlockTab?.(tab) : onSelectTab(tab.id)}
             onDoubleClick={() => { if (hasChildren && !locked) toggleExpand(tab.id) }}
-            className={`atlas-nav-item flex-1 flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${active ? 'is-active' : ''} ${dropActive ? 'scale-[1.02]' : ''}`}
+            className={`atlas-nav-item atlas-folder-row flex-1 flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${active ? 'is-active' : ''} ${dropActive ? 'scale-[1.02]' : ''}`}
             style={{
-              paddingLeft: `${12 + depth * 16}px`,
               border: dropActive ? '1px dashed rgba(129,140,248,0.78)' : '1px dashed transparent',
               boxSizing: 'border-box',
               background: dropActive ? 'rgba(124, 140, 255, 0.18)' : active ? undefined : 'transparent',
@@ -161,18 +164,30 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
             <div className="star-node h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: tab.color || 'var(--accent-primary)' }} />
             <span className="truncate">{tab.name}</span>
             {dropActive && <ArrowSquareIn size={14} weight="fill" className="shrink-0 text-accent-400" />}
-            <span className="text-[10px] ml-auto transition-opacity group-hover:opacity-0" style={{ color: 'var(--text-muted)' }}>
-              {locked ? 'locked' : <AnimatedCounter value={tab.total_link_count ?? tab.link_count} />}
+            <span className="atlas-folder-count metadata-line ml-auto text-[10px] transition-opacity group-hover:opacity-0">
+              {locked ? 'locked' : unlockedProtected ? 'open' : <AnimatedCounter value={tab.total_link_count ?? tab.link_count} />}
             </span>
           </motion.button>
-          <button
-            onClick={() => onDeleteTab(tab.id)}
-            className="hidden group-hover:block absolute right-2 top-1/2 -translate-y-1/2 p-1 transition-all hover:text-red-400"
-            style={{ color: 'var(--text-muted)' }}
-            aria-label={`Delete ${tab.name}`}
-          >
-            <X size={12} />
-          </button>
+          <div className="atlas-row-actions absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            {unlockedProtected && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onLockTab?.(tab) }}
+                className="atlas-row-icon-button"
+                aria-label={`Lock ${tab.name}`}
+                title="Lock folder"
+              >
+                <LockKey size={12} weight="fill" />
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onDeleteTab(tab.id) }}
+              className="atlas-row-icon-button hover:text-red-400"
+              aria-label={`Delete ${tab.name}`}
+              title="Delete folder"
+            >
+              <X size={12} />
+            </button>
+          </div>
         </div>
         {/* Children */}
         {hasChildren && isExpanded && !locked && (
@@ -190,57 +205,70 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
 
   return (
     <aside
-      className="atlas-sidebar hidden sm:flex flex-col w-64 shrink-0 h-[100dvh] sticky top-0"
+      className="atlas-sidebar hidden sm:flex flex-col w-72 2xl:w-80 shrink-0 h-[100dvh] sticky top-0"
       onDragLeave={(e) => {
         if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return
         setDropTargetId(null)
         setDragActive(false)
       }}
     >
-      {/* Logo */}
-      <button onClick={() => navigate('/')} className="px-5 py-5 flex items-center gap-2.5 group cursor-pointer">
-        <div className="atlas-logo-mark h-9 w-9 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-105">
-          <FolderSimple size={18} weight="fill" className="text-white" />
-        </div>
-        <div className="min-w-0">
-          <span className="block text-base font-bold tracking-tight transition-colors group-hover:text-accent-400" style={{ color: 'var(--text-primary)' }}>LinkKeep</span>
-          <span className="metadata-line block text-[9px] uppercase">link atlas</span>
-        </div>
-      </button>
+      <div className="px-5 py-5">
+        <button onClick={() => navigate('/')} className="atlas-brand-button group w-full">
+          <div className="atlas-constellation-mark transition-transform group-hover:scale-105" aria-hidden="true">
+            <span className="atlas-star star-a" />
+            <span className="atlas-star star-b" />
+            <span className="atlas-star star-c" />
+            <span className="atlas-star star-d" />
+            <span className="atlas-star star-e" />
+            <span className="atlas-star star-f" />
+            <span className="atlas-line line-a" />
+            <span className="atlas-line line-b" />
+            <span className="atlas-line line-c" />
+            <span className="atlas-line line-d" />
+          </div>
+          <div className="min-w-0 text-left">
+            <span className="block text-base font-semibold transition-colors group-hover:text-accent-400" style={{ color: 'var(--text-primary)' }}>LinkKeep</span>
+            <span className="metadata-line block text-[10px]">Your link atlas</span>
+          </div>
+        </button>
+      </div>
 
-      {/* Navigation */}
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
-        {/* Home */}
+      <div className="atlas-sidebar-scroll flex-1 overflow-y-auto px-3 pb-3">
+        <div className="atlas-section-heading">
+          <span>Atlas Rail</span>
+          <button type="button" onClick={() => setCreating(true)} className="atlas-section-action" aria-label="Create folder">
+            <Plus size={13} weight="bold" />
+          </button>
+        </div>
         <motion.button
           layout
           onClick={() => navigate('/')}
-          className={`atlas-nav-item w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${isHomeActive ? 'is-active' : ''}`}
+          className={`atlas-nav-item atlas-system-row w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${isHomeActive ? 'is-active' : ''}`}
           style={{
             color: isHomeActive ? 'var(--accent-primary)' : 'var(--text-tertiary)',
           }}
         >
-          <FolderSimple size={16} />
-          <span>Home</span>
+          <Sparkle size={16} />
+          <span>Overview</span>
         </motion.button>
 
-        {/* All Links */}
         <motion.button
           layout
           onClick={onSelectAll}
-          className={`atlas-nav-item w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${isAllActive ? 'is-active' : ''}`}
+          className={`atlas-nav-item atlas-system-row w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${isAllActive ? 'is-active' : ''}`}
           style={{
             color: isAllActive ? 'var(--accent-primary)' : 'var(--text-tertiary)',
           }}
         >
           <Stack size={16} weight="bold" />
           <span>All Links</span>
+          <span className="metadata-line ml-auto text-[10px]">{allLinksCount}</span>
         </motion.button>
 
-        {/* Favorites */}
         <motion.button
           layout
           onClick={onSelectFavorites}
-          className={`atlas-nav-item w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${isFavActive ? 'is-active' : ''}`}
+          className={`atlas-nav-item atlas-system-row w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${isFavActive ? 'is-active' : ''}`}
           style={{
             color: isFavActive ? 'var(--accent-amber)' : 'var(--text-tertiary)',
           }}
@@ -249,13 +277,29 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
           <span>Favorites</span>
         </motion.button>
 
-        {/* Divider */}
-        <div className="my-2" style={{ borderTop: '1px solid var(--border-subtle)' }} />
+        <div className="atlas-section-heading mt-5">
+          <span>Collections</span>
+          <span className="metadata-line text-[10px]">{rootTabs.length}</span>
+        </div>
+
+        {dragActive && (
+          <div className="mx-1 mb-2 rounded-xl px-3 py-2 text-[11px] border border-dashed border-accent-500/40 bg-accent-500/10 text-accent-300">
+            Drop onto a folder to move
+          </div>
+        )}
+        <div className="atlas-tree-branch space-y-0.5">
+          {rootTabs.map(tab => renderTab(tab))}
+        </div>
+
+        <div className="atlas-section-heading mt-5">
+          <span>Tools</span>
+          {protectedCount > 0 && <span className="metadata-line text-[10px]">{protectedCount} protected</span>}
+        </div>
 
         <motion.button
           layout
           onClick={() => navigate('/shares')}
-          className={`atlas-nav-item w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${isSharesActive ? 'is-active' : ''}`}
+          className={`atlas-nav-item atlas-system-row w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${isSharesActive ? 'is-active' : ''}`}
           style={{
             color: isSharesActive ? 'var(--accent-primary)' : 'var(--text-tertiary)',
           }}
@@ -267,7 +311,7 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
         <motion.button
           layout
           onClick={() => navigate('/recommendations')}
-          className={`atlas-nav-item w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${isRecommendationsActive ? 'is-active' : ''}`}
+          className={`atlas-nav-item atlas-system-row w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${isRecommendationsActive ? 'is-active' : ''}`}
           style={{
             color: isRecommendationsActive ? 'var(--accent-primary)' : 'var(--text-tertiary)',
           }}
@@ -280,7 +324,7 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
           <motion.button
             layout
             onClick={() => navigate('/admin')}
-            className={`atlas-nav-item w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${isAdminActive ? 'is-active' : ''}`}
+            className={`atlas-nav-item atlas-system-row w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all surface-hover ${isAdminActive ? 'is-active' : ''}`}
             style={{
               color: isAdminActive ? 'var(--accent-primary)' : 'var(--text-tertiary)',
             }}
@@ -290,21 +334,9 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
           </motion.button>
         )}
 
-        <div className="my-2" style={{ borderTop: '1px solid var(--border-subtle)' }} />
-
-        {/* Folders */}
-        {dragActive && (
-          <div className="mx-1 mb-2 rounded-xl px-3 py-2 text-[11px] border border-dashed border-accent-500/40 bg-accent-500/10 text-accent-300">
-            Drop onto a folder to move
-          </div>
-        )}
-        <div className="atlas-tree-branch space-y-0.5">
-          {rootTabs.map(tab => renderTab(tab))}
-        </div>
-
         {/* New folder button */}
         {creating ? (
-          <form onSubmit={handleCreate} className="glass rounded-xl px-3 py-2.5 space-y-2">
+          <form onSubmit={handleCreate} className="atlas-new-folder-form rounded-xl px-3 py-2.5 space-y-2 mt-2">
             <input
               autoFocus
               value={newName}
@@ -332,7 +364,7 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
         ) : (
           <button
             onClick={() => setCreating(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm surface-hover transition-all"
+            className="atlas-nav-item atlas-system-row w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm surface-hover transition-all mt-1"
             style={{ color: 'var(--text-muted)' }}
           >
             <Plus size={14} weight="bold" />
@@ -341,11 +373,30 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
         )}
       </div>
 
-      {/* Bottom actions */}
+      <div className="atlas-vault-card mx-4 mb-3 rounded-2xl p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Vault Status</div>
+            <div className="metadata-line mt-1 text-[10px]">{safeTabs.length} folders tracked</div>
+          </div>
+          <div className="metadata-line flex items-center gap-1 text-[10px]">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            Synced
+          </div>
+        </div>
+        <div className="atlas-vault-meter mt-3" aria-hidden="true">
+          <span style={{ width: `${Math.min(86, Math.max(16, safeTabs.length * 8))}%` }} />
+        </div>
+        <div className="mt-2 flex items-center justify-between">
+          <span className="metadata-line text-[10px]">{allLinksCount} saved links</span>
+          <button type="button" onClick={() => navigate('/settings')} className="atlas-mini-button">Manage</button>
+        </div>
+      </div>
+
       <div className="px-3 py-2 space-y-0.5" style={{ borderTop: '1px solid var(--border-subtle)' }}>
         <button
           onClick={() => navigate('/settings')}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm surface-hover transition-all"
+          className="atlas-nav-item atlas-system-row w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm surface-hover transition-all"
           style={{ color: 'var(--text-tertiary)' }}
         >
           <GearSix size={16} />
@@ -354,7 +405,7 @@ export default function Sidebar({ tabs, activePath, adminAvailable = false, onSe
         {onLogout && (
           <button
             onClick={onLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all hover:text-red-400"
+            className="atlas-nav-item atlas-system-row w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all hover:text-red-400"
             style={{ color: 'var(--text-muted)' }}
           >
             <SignOut size={16} />

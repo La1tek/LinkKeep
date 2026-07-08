@@ -540,6 +540,14 @@ export default function Home({ token }) {
     refreshTabs()
   }
 
+  const handleLockTab = (tab) => {
+    if (!tab?.id) return
+    api.clearFolderUnlock(tab.id)
+    refreshTabs()
+    refreshLinks()
+    toast.success('Folder locked')
+  }
+
   const toggleDarkMode = () => {
     const nextDark = !document.documentElement.classList.contains('dark')
     document.documentElement.classList.toggle('dark', nextDark)
@@ -711,6 +719,7 @@ export default function Home({ token }) {
                       onEdit={(t) => setEditTabModal(t)}
                       onDelete={handleDeleteTab}
                       onUnlock={(t) => setFolderLockModal({ tab: t, mode: 'unlock' })}
+                      onLock={handleLockTab}
                       onProtect={(t, mode) => setFolderLockModal({ tab: t, mode })}
                     />
                   ))}
