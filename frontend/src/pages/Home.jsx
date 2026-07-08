@@ -4,23 +4,26 @@ import {
   Archive,
   ArrowUpRight,
   Bell,
+  BookOpen,
   CaretDown,
   CheckCircle,
   Clipboard,
   ClockCounterClockwise,
   DotsThree,
+  FileText,
   FolderOpen,
   FolderSimple,
   GridFour,
+  ImageSquare,
   Lightning,
   Link as LinkIcon,
   MagnifyingGlass,
   Moon,
+  NotePencil,
   Plus,
   Sparkle,
   Stack,
   Star,
-  UploadSimple,
   WarningCircle,
 } from '@phosphor-icons/react'
 import { useNavigate } from 'react-router-dom'
@@ -247,7 +250,7 @@ function ConstellationMap({ folders, allCount, favCount, onSelectNode }) {
   )
 }
 
-function LinkDashboardRow({ link, index }) {
+function LinkDashboardRow({ link, index, selected, onSelect, onArchive, onOpen }) {
   const favicon = link.favicon || getFaviconUrl(link.url)
   const domain = getDomain(link.url)
   const tags = Array.isArray(link.tags) ? link.tags.slice(0, 3) : []
@@ -259,36 +262,43 @@ function LinkDashboardRow({ link, index }) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.24, delay: index * 0.04 }}
-      className="link-row"
+      className={`link-row ${selected ? 'is-selected' : ''}`}
     >
-      <a className="link-row-hit focus-ring" href={link.url} target="_blank" rel="noreferrer" aria-label={`Open ${link.title}`} />
-      <div className="stamp-frame">
-        {favicon ? (
-          <img src={favicon} alt="" onError={(e) => { e.currentTarget.src = getFaviconUrl(link.url) || '' }} />
-        ) : (
-          <LinkIcon size={24} weight="duotone" />
-        )}
-      </div>
-
-      <div className="min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <h3 className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{link.title || domain || link.url}</h3>
-          <ArrowUpRight size={13} weight="bold" className="shrink-0" style={{ color: 'var(--text-muted)' }} />
+      <button
+        type="button"
+        onClick={() => onSelect?.(link)}
+        className="link-row-main focus-ring"
+        aria-pressed={selected}
+        aria-label={`Inspect ${link.title || domain || link.url}`}
+      >
+        <div className="stamp-frame">
+          {favicon ? (
+            <img src={favicon} alt="" onError={(e) => { e.currentTarget.src = getFaviconUrl(link.url) || '' }} />
+          ) : (
+            <LinkIcon size={24} weight="duotone" />
+          )}
         </div>
-        <div className="metadata-line mt-1 flex flex-wrap items-center gap-2 text-[11px]">
-          <span className="truncate max-w-[180px]" style={{ color: 'var(--accent-mint)' }}>{domain || link.url}</span>
-          <span>{getLinkKind(link)}</span>
-          {link.created_at && <span>{formatShortDate(link.created_at)}</span>}
-        </div>
-      </div>
 
-      <div className="hidden min-w-0 flex-wrap gap-1.5 md:flex">
-        {tags.length ? tags.map(tag => (
-          <span key={tag} className="link-tag">{tag}</span>
-        )) : (
-          <span className="link-tag is-muted">untagged</span>
-        )}
-      </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <h3 className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{link.title || domain || link.url}</h3>
+            <ArrowUpRight size={13} weight="bold" className="shrink-0" style={{ color: 'var(--text-muted)' }} />
+          </div>
+          <div className="metadata-line mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="truncate max-w-[180px]" style={{ color: 'var(--accent-mint)' }}>{domain || link.url}</span>
+            <span>{getLinkKind(link)}</span>
+            {link.created_at && <span>{formatShortDate(link.created_at)}</span>}
+          </div>
+        </div>
+
+        <div className="hidden min-w-0 flex-wrap gap-1.5 md:flex">
+          {tags.length ? tags.map(tag => (
+            <span key={tag} className="link-tag">{tag}</span>
+          )) : (
+            <span className="link-tag is-muted">untagged</span>
+          )}
+        </div>
+      </button>
 
       <div className="link-row-actions">
         <span className={`status-chip ${archiveState.className}`}>
@@ -296,62 +306,158 @@ function LinkDashboardRow({ link, index }) {
           {archiveState.label}
         </span>
         {link.is_favorite && <Star size={16} weight="fill" className="text-amber-400" />}
-        <DotsThree size={18} weight="bold" style={{ color: 'var(--text-muted)' }} />
+        <button type="button" onClick={() => onArchive?.(link)} className="link-row-icon-button" aria-label={`Archive ${link.title || domain || link.url}`}>
+          <Archive size={16} />
+        </button>
+        <button type="button" onClick={() => onOpen?.(link)} className="link-row-icon-button" aria-label={`Open ${link.title || domain || link.url}`}>
+          <ArrowUpRight size={16} weight="bold" />
+        </button>
       </div>
     </motion.article>
   )
 }
 
-function CommandPalettePanel({ onNewFolder, onQuickImport, pasting, navigate, allCount, favCount, folders }) {
+function LinkInspectorPanel({ link, folder, onArchive, onCopy, onOpen, onToggleFavorite, onNewFolder, onQuickImport, pasting, navigate, allCount, favCount, folders }) {
+  const archiveState = link ? getArchiveState(link) : null
+  const StatusIcon = archiveState?.Icon || CheckCircle
+  const domain = link ? getDomain(link.url) : ''
+  const favicon = link ? (link.favicon || getFaviconUrl(link.url)) : null
+  const previewImage = link?.image || favicon
+  const tags = Array.isArray(link?.tags) ? link.tags.slice(0, 5) : []
+  const hasNote = Boolean(link?.note?.trim())
   const primaryFolder = folders[0]
-  const actions = [
-    { label: 'Add new link', helper: 'cmd n', Icon: Plus, onClick: onQuickImport },
-    { label: 'Quick import', helper: 'cmd i', Icon: Clipboard, onClick: onQuickImport, disabled: pasting },
-    { label: 'New collection', helper: 'cmd b', Icon: FolderSimple, onClick: onNewFolder },
-    { label: 'Upload from device', helper: 'soon', Icon: UploadSimple, onClick: onQuickImport },
-  ]
-  const jumps = [
+  const commandJumps = [
     { label: 'All Links', value: formatCompactNumber(allCount), Icon: Stack, onClick: () => navigate('/folder/all') },
     { label: 'Favorites', value: formatCompactNumber(favCount), Icon: Star, onClick: () => navigate('/favorites') },
-    { label: 'Recommendations', value: 'AI', Icon: Sparkle, onClick: () => navigate('/recommendations') },
     primaryFolder && { label: primaryFolder.name, value: formatCompactNumber(primaryFolder.total_link_count ?? primaryFolder.link_count ?? 0), Icon: FolderOpen, onClick: () => navigate(`/folder/${primaryFolder.id}`) },
   ].filter(Boolean)
-  const recentSearches = ['tag:design', 'site:github.com', 'is:dead', 'has:note']
 
   return (
-    <aside className="command-palette-panel hidden xl:block">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="kbd-token">⌘ K</span>
-          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Command palette</span>
+    <aside className="inspector-panel hidden xl:flex">
+      <div className="inspector-section pb-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="kbd-token">⌘ K</span>
+            <span className="truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Inspector</span>
+          </div>
+          <button type="button" onClick={onQuickImport} disabled={pasting} className="icon-button" aria-label="Quick import">
+            <Clipboard size={16} />
+          </button>
         </div>
-        <button type="button" className="icon-button" aria-label="Close command palette">
-          <CaretDown size={15} />
-        </button>
       </div>
 
-      <div className="palette-search">
-        <MagnifyingGlass size={17} />
-        <span>Search anything...</span>
-      </div>
+      {link ? (
+        <>
+          <div className="inspector-preview">
+            <LinkIcon size={48} weight="duotone" className="inspector-preview-fallback" />
+            {previewImage && (
+              <img src={previewImage} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+            )}
+            <div className="inspector-preview-grid" aria-hidden="true" />
+          </div>
 
-      <div className="palette-section">
-        <div className="metadata-line text-[10px] uppercase">Actions</div>
-        <div className="mt-2 space-y-1">
-          {actions.map(({ label, helper, Icon, onClick, disabled }) => (
-            <button key={label} type="button" onClick={onClick} disabled={disabled} className="palette-row focus-ring">
-              <Icon size={16} />
-              <span>{disabled ? 'Importing...' : label}</span>
-              <span className="kbd-token ml-auto">{helper}</span>
+          <div className="inspector-section">
+            <div className="metadata-line text-[10px] uppercase">Selected capture</div>
+            <h2 className="mt-2 text-lg font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>{link.title || domain || link.url}</h2>
+            <p className="mt-1 truncate text-sm" style={{ color: 'var(--accent-mint)' }}>{domain || link.url}</p>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <span className={`status-chip ${archiveState.className}`}>
+                <StatusIcon size={12} weight="fill" />
+                {archiveState.label}
+              </span>
+              <span className="status-chip is-muted">{getLinkKind(link)}</span>
+              {folder && <span className="status-chip is-muted">{folder.name}</span>}
+            </div>
+          </div>
+
+          <div className="inspector-action-grid">
+            <button type="button" onClick={() => onOpen(link)} className="inspector-action focus-ring">
+              <ArrowUpRight size={16} weight="bold" />
+              Open
             </button>
-          ))}
-        </div>
-      </div>
+            <button type="button" onClick={() => onArchive(link)} className="inspector-action focus-ring">
+              <Archive size={16} />
+              Archive
+            </button>
+            <button type="button" onClick={() => onCopy(link)} className="inspector-action focus-ring">
+              <Clipboard size={16} />
+              Copy URL
+            </button>
+            <button type="button" onClick={() => onToggleFavorite(link)} className="inspector-action focus-ring">
+              <Star size={16} weight={link.is_favorite ? 'fill' : 'regular'} />
+              {link.is_favorite ? 'Starred' : 'Star'}
+            </button>
+          </div>
 
-      <div className="palette-section">
-        <div className="metadata-line text-[10px] uppercase">Jump to</div>
+          <div className="inspector-section">
+            <div className="metadata-line text-[10px] uppercase">Archive timeline</div>
+            <div className="archive-timeline mt-3">
+              <div className="timeline-item is-done">
+                <CheckCircle size={14} weight="fill" />
+                <div>
+                  <strong>Saved</strong>
+                  <span>{formatShortDate(link.created_at) || 'Recently captured'}</span>
+                </div>
+              </div>
+              <div className={`timeline-item ${link.archive_status === 'completed' ? 'is-done' : 'is-pending'}`}>
+                <BookOpen size={14} weight="fill" />
+                <div>
+                  <strong>Readable text</strong>
+                  <span>{link.archive_status === 'completed' ? 'Available in archive' : 'Waiting for capture'}</span>
+                </div>
+              </div>
+              <div className={`timeline-item ${link.archive_status === 'completed' ? 'is-done' : 'is-pending'}`}>
+                <ImageSquare size={14} weight="fill" />
+                <div>
+                  <strong>Screenshot</strong>
+                  <span>{link.image ? 'Preview detected' : 'No preview yet'}</span>
+                </div>
+              </div>
+              <div className="timeline-item is-pending">
+                <FileText size={14} weight="fill" />
+                <div>
+                  <strong>PDF copy</strong>
+                  <span>Queued with full preservation</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="inspector-section">
+            <div className="flex items-center justify-between gap-3">
+              <div className="metadata-line text-[10px] uppercase">Notes & highlights</div>
+              <NotePencil size={15} style={{ color: 'var(--text-muted)' }} />
+            </div>
+            <div className="inspector-note mt-3">
+              {hasNote ? link.note : 'No note yet. Use highlights and notes to turn saved links into a knowledge base.'}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {tags.length ? tags.map(tag => <span key={tag} className="link-tag">{tag}</span>) : <span className="link-tag is-muted">untagged</span>}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="inspector-empty">
+          <Sparkle size={28} weight="duotone" />
+          <h2>Select a capture</h2>
+          <p>Saved links will show preview, archive status, notes, and quick actions here.</p>
+        </div>
+      )}
+
+      <div className="inspector-section mt-auto">
+        <div className="metadata-line text-[10px] uppercase">Command center</div>
         <div className="mt-2 space-y-1">
-          {jumps.map(({ label, value, Icon, onClick }) => (
+          <button type="button" onClick={onQuickImport} disabled={pasting} className="palette-row focus-ring">
+            <Clipboard size={16} />
+            <span>{pasting ? 'Importing...' : 'Quick import'}</span>
+            <span className="kbd-token ml-auto">cmd i</span>
+          </button>
+          <button type="button" onClick={onNewFolder} className="palette-row focus-ring">
+            <FolderSimple size={16} />
+            <span>New collection</span>
+            <span className="kbd-token ml-auto">cmd b</span>
+          </button>
+          {commandJumps.map(({ label, value, Icon, onClick }) => (
             <button key={label} type="button" onClick={onClick} className="palette-row focus-ring">
               <Icon size={16} weight={label === 'Favorites' ? 'fill' : 'regular'} />
               <span className="truncate">{label}</span>
@@ -360,20 +466,6 @@ function CommandPalettePanel({ onNewFolder, onQuickImport, pasting, navigate, al
           ))}
         </div>
       </div>
-
-      <div className="palette-section">
-        <div className="metadata-line text-[10px] uppercase">Recent searches</div>
-        <div className="mt-2 space-y-1">
-          {recentSearches.map((item) => (
-            <button key={item} type="button" className="palette-row focus-ring">
-              <ClockCounterClockwise size={15} />
-              <span>{item}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="metadata-line pt-3 text-[10px]">↑↓ navigate · enter select · esc close</div>
     </aside>
   )
 }
@@ -393,6 +485,7 @@ export default function Home({ token }) {
   const [pasting, setPasting] = useState(false)
   const [homeSort, setHomeSort] = useState('newest')
   const [folderLockModal, setFolderLockModal] = useState(null)
+  const [selectedLinkId, setSelectedLinkId] = useState(null)
   const shareTargetHandled = useRef(false)
   const navigate = useNavigate()
 
@@ -470,8 +563,26 @@ export default function Home({ token }) {
   const recentLinks = useMemo(() => {
     return [...safeLinks]
       .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
-      .slice(0, 4)
+      .slice(0, 5)
   }, [safeLinks])
+
+  useEffect(() => {
+    if (!safeLinks.length) {
+      if (selectedLinkId !== null) setSelectedLinkId(null)
+      return
+    }
+    if (!safeLinks.some(link => link.id === selectedLinkId)) {
+      setSelectedLinkId(safeLinks[0].id)
+    }
+  }, [safeLinks, selectedLinkId])
+
+  const selectedLink = useMemo(() => {
+    return safeLinks.find(link => link.id === selectedLinkId) || recentLinks[0] || safeLinks[0] || null
+  }, [safeLinks, recentLinks, selectedLinkId])
+
+  const selectedFolder = useMemo(() => {
+    return selectedLink?.tab_id ? safeTabs.find(tab => tab.id === selectedLink.tab_id) : null
+  }, [safeTabs, selectedLink])
 
   // Build a map of tab_id -> links for preview favicons
   const linksByTab = useMemo(() => {
@@ -546,6 +657,44 @@ export default function Home({ token }) {
     refreshTabs()
     refreshLinks()
     toast.success('Folder locked')
+  }
+
+  const handleOpenLink = (link) => {
+    if (!link?.url) return
+    window.open(link.url, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleCopyLink = async (link) => {
+    if (!link?.url) return
+    try {
+      await navigator.clipboard.writeText(link.url)
+      toast.success('URL copied')
+    } catch {
+      toast.error('Clipboard unavailable')
+    }
+  }
+
+  const handleArchiveDashboardLink = async (link) => {
+    if (!link?.id) return
+    try {
+      toast.success('Archiving link...')
+      await api.archiveLink(link.id)
+      await refreshLinks()
+      toast.success('Archive capture queued')
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const handleToggleFavoriteLink = async (link) => {
+    if (!link?.id) return
+    try {
+      await api.toggleFavorite(link.id)
+      await refreshLinks()
+      toast.success(link.is_favorite ? 'Removed from favorites' : 'Added to favorites')
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   const toggleDarkMode = () => {
@@ -675,7 +824,17 @@ export default function Home({ token }) {
 
               {recentLinks.length > 0 ? (
                 <div className="space-y-2">
-                  {recentLinks.map((link, index) => <LinkDashboardRow key={link.id || link.url} link={link} index={index} />)}
+                  {recentLinks.map((link, index) => (
+                    <LinkDashboardRow
+                      key={link.id || link.url}
+                      link={link}
+                      index={index}
+                      selected={selectedLink?.id === link.id}
+                      onSelect={(nextLink) => setSelectedLinkId(nextLink.id)}
+                      onArchive={handleArchiveDashboardLink}
+                      onOpen={handleOpenLink}
+                    />
+                  ))}
                 </div>
               ) : (
                 <div className="empty-dashboard-panel">
@@ -742,7 +901,13 @@ export default function Home({ token }) {
             </section>
           </div>
 
-          <CommandPalettePanel
+          <LinkInspectorPanel
+            link={selectedLink}
+            folder={selectedFolder}
+            onArchive={handleArchiveDashboardLink}
+            onCopy={handleCopyLink}
+            onOpen={handleOpenLink}
+            onToggleFavorite={handleToggleFavoriteLink}
             onNewFolder={() => setNewTabOpen(true)}
             onQuickImport={handlePasteSave}
             pasting={pasting}

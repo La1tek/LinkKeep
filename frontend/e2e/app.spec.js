@@ -177,3 +177,45 @@ test('locks an unlocked protected folder from the folder card menu', async ({ pa
   expect(unlocks['42']).toBeUndefined()
   await expect(page.getByText('Folder locked')).toBeVisible()
 })
+
+test('selects a dashboard link in the inspector panel', async ({ page }) => {
+  await mockAuthedApi(page, {
+    tabs: [
+      { id: 7, name: 'Research', color: '#7c8cff', parent_id: null, link_count: 2, total_link_count: 2, child_count: 0 },
+    ],
+    links: [
+      {
+        id: 1,
+        title: 'First capture',
+        url: 'https://first.example.com',
+        tab_id: 7,
+        tags: ['alpha'],
+        created_at: '2026-07-07T00:00:00Z',
+        archive_status: 'completed',
+        http_status: 200,
+      },
+      {
+        id: 2,
+        title: 'Second capture',
+        url: 'https://second.example.com',
+        tab_id: 7,
+        tags: ['beta'],
+        created_at: '2026-07-08T00:00:00Z',
+        archive_status: 'pending',
+        http_status: 200,
+      },
+    ],
+  })
+  await page.addInitScript(() => {
+    window.localStorage.setItem('lk_token', 'test-token')
+    window.localStorage.setItem('lk_user', JSON.stringify({ id: 1, username: 'demo', created_at: '2026-07-07T00:00:00Z' }))
+  })
+
+  await page.goto('/')
+
+  const inspector = page.locator('.inspector-panel')
+  await expect(inspector.getByText('First capture')).toBeVisible()
+  await page.getByRole('button', { name: 'Inspect Second capture' }).click()
+  await expect(inspector.getByText('Second capture')).toBeVisible()
+  await expect(inspector.getByText('Archiving')).toBeVisible()
+})
