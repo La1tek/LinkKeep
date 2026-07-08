@@ -1,4 +1,4 @@
-// LinkKeep Extension v2.2 — popup.js
+// LinkKeep Extension v2.6 — popup.js
 (async () => {
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => document.querySelectorAll(s);
@@ -74,23 +74,33 @@
 
     $('#loginBtn').addEventListener('click', async () => {
       const server = $('#serverUrl').value.replace(/\/+$/, '');
-      const username = $('#username').value.trim();
+      const identity = $('#username').value.trim();
       const password = $('#password').value;
-      if (!server || !username || !password) { setStatus('Fill all fields', 'error'); return; }
+      const tokenMode = identity.startsWith('lkat_');
+      if (!server || !identity || (!tokenMode && !password)) { setStatus(tokenMode ? 'Enter server and API token' : 'Fill all fields', 'error'); return; }
 
       $('#loginBtn').disabled = true;
       setStatus('Connecting...', 'loading');
       try {
-        // Direct fetch login (no service worker dependency)
-        const fd = new FormData();
-        fd.append('username', username);
-        fd.append('password', password);
-        const r = await fetch(`${server}/api/auth/login`, { method: 'POST', body: fd });
-        const text = await r.text();
-        let data;
-        try { data = JSON.parse(text); } catch { throw new Error('Invalid server response'); }
-        if (!r.ok) throw new Error(data?.detail || `HTTP ${r.status}`);
-        await chrome.storage.local.set({ lk_server: server, lk_token: data.access_token, lk_user: username });
+        if (tokenMode) {
+          const r = await fetch(`${server}/api/auth/me`, { headers: { Authorization: `Bearer ${identity}` } });
+          const text = await r.text();
+          let user;
+          try { user = JSON.parse(text); } catch { throw new Error('Invalid server response'); }
+          if (!r.ok) throw new Error(user?.detail || `HTTP ${r.status}`);
+          await chrome.storage.local.set({ lk_server: server, lk_token: identity, lk_user: user?.username || 'API token' });
+        } else {
+          // Direct fetch login (no service worker dependency)
+          const fd = new FormData();
+          fd.append('username', identity);
+          fd.append('password', password);
+          const r = await fetch(`${server}/api/auth/login`, { method: 'POST', body: fd });
+          const text = await r.text();
+          let data;
+          try { data = JSON.parse(text); } catch { throw new Error('Invalid server response'); }
+          if (!r.ok) throw new Error(data?.detail || `HTTP ${r.status}`);
+          await chrome.storage.local.set({ lk_server: server, lk_token: data.access_token, lk_user: identity });
+        }
         hideStatus();
         location.reload();
       } catch (e) {

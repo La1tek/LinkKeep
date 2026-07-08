@@ -40,6 +40,7 @@
     .login p { font-size: 11px; color: var(--text-muted); margin-bottom: 14px; }
     .field { margin-bottom: 10px; }
     .field label { display: block; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; font-weight: 500; }
+    .field .hint { margin-top: 4px; font-size: 10px; color: var(--text-muted); line-height: 1.35; }
     .field input, .field textarea {
       width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
       background: var(--bg-input); color: var(--text); font-size: 12px; outline: none;
@@ -133,12 +134,13 @@
         <input id="serverUrl" placeholder="http://your-server:9091" />
       </div>
       <div class="field">
-        <label>Username</label>
-        <input id="username" placeholder="username" />
+        <label>Username or API token</label>
+        <input id="username" placeholder="username or lkat_..." />
       </div>
       <div class="field">
         <label>Password</label>
         <input id="password" type="password" placeholder="••••••••" />
+        <div class="hint">Leave password empty when using an API token.</div>
       </div>
       <button id="loginBtn" class="btn btn-primary">Connect</button>
     </div>
