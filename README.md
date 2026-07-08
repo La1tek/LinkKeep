@@ -1,4 +1,4 @@
-# LinkKeep v2.4
+# LinkKeep v2.5
 
 Self-hosted link manager with folders, tags, favorites, full-text search, public shared collections, backups, browser extension, PWA support, and optional Telegram link intake.
 

@@ -1,4 +1,4 @@
-# LinkKeep Browser Extension v2.4
+# LinkKeep Browser Extension v2.5
 
 A Chrome extension for quick link saving and bookmark sync with your self-hosted LinkKeep instance.
 
