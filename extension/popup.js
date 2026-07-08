@@ -1,4 +1,4 @@
-// LinkKeep Extension v2.6 — popup.js
+// LinkKeep Extension v2.7 — popup.js
 (async () => {
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => document.querySelectorAll(s);

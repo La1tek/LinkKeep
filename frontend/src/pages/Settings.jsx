@@ -513,7 +513,7 @@ export default function Settings({ user, adminAvailable = false }) {
 
         <Section title="About">
           <div className="glass rounded-2xl p-4 space-y-2">
-            <Row label="Version" value="2.6.0" mono />
+            <Row label="Version" value="2.7.0" mono />
             <Row label="Stack" value="FastAPI + React + Vite" />
             <a href="https://github.com/La1tek/LinkKeep" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-accent-400 hover:text-accent-300 pt-1"><GithubLogo size={14} />github.com/La1tek/LinkKeep</a>
           </div>
