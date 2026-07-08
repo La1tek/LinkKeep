@@ -107,6 +107,7 @@ export default function FolderCard({ tab, links = [], index = 0, onEdit, onDelet
             onClick={(e) => { e.stopPropagation(); setShowMenu(true) }}
             className="p-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100 sm:opacity-0 hover:opacity-100"
             style={{ color: 'var(--text-muted)' }}
+            aria-label={`Open actions for ${tab.name}`}
           >
             <DotsThree size={16} weight="bold" />
           </button>

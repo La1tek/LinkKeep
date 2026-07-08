@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LockKey, LockKeyOpen, X } from '@phosphor-icons/react'
 import { api } from '../lib/api'
@@ -7,12 +7,14 @@ export default function FolderLockModal({ open, tab, mode = 'unlock', onClose, o
   const [pin, setPin] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const pinRefs = useRef([])
 
   useEffect(() => {
     if (!open) return
     setPin('')
     setError('')
     setBusy(false)
+    requestAnimationFrame(() => pinRefs.current[0]?.focus())
   }, [open, tab?.id, mode])
 
   if (!tab) return null
@@ -39,10 +41,59 @@ export default function FolderLockModal({ open, tab, mode = 'unlock', onClose, o
   }[mode] || {}
 
   const validPin = /^\d{4}$/.test(pin)
+  const pinDigits = Array.from({ length: 4 }, (_, index) => pin[index] || '')
 
-  const handlePinChange = (value) => {
-    setPin(value.replace(/\D/g, '').slice(0, 4))
+  const focusPinInput = (index) => {
+    pinRefs.current[Math.max(0, Math.min(3, index))]?.focus()
+  }
+
+  const handlePinChange = (index, value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 4 - index).split('')
+    const next = [...pinDigits]
+    if (!digits.length) {
+      next[index] = ''
+    } else {
+      digits.forEach((digit, offset) => {
+        next[index + offset] = digit
+      })
+    }
+    setPin(next.join(''))
     setError('')
+    if (digits.length) focusPinInput(index + digits.length)
+  }
+
+  const handlePinKeyDown = (index, event) => {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      focusPinInput(index - 1)
+      return
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      focusPinInput(index + 1)
+      return
+    }
+    if (event.key === 'Backspace' && !pinDigits[index] && index > 0) {
+      event.preventDefault()
+      const next = [...pinDigits]
+      next[index - 1] = ''
+      setPin(next.join(''))
+      setError('')
+      focusPinInput(index - 1)
+    }
+  }
+
+  const handlePinPaste = (index, event) => {
+    const pasted = event.clipboardData.getData('text').replace(/\D/g, '')
+    if (!pasted) return
+    event.preventDefault()
+    const next = [...pinDigits]
+    pasted.slice(0, 4 - index).split('').forEach((digit, offset) => {
+      next[index + offset] = digit
+    })
+    setPin(next.join(''))
+    setError('')
+    focusPinInput(index + pasted.length)
   }
 
   const submit = async (e) => {
@@ -108,18 +159,26 @@ export default function FolderLockModal({ open, tab, mode = 'unlock', onClose, o
 
             <div className="px-5 py-4 space-y-3">
               <label className="text-[10px] uppercase tracking-wider font-medium" style={{ color: 'var(--text-muted)' }}>4-digit folder PIN</label>
-              <input
-                autoFocus
-                type="password"
-                value={pin}
-                onChange={(e) => handlePinChange(e.target.value)}
-                className="input-base w-full rounded-xl px-4 py-3 text-center text-lg font-mono outline-none"
-                placeholder="0000"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={4}
-                autoComplete="one-time-code"
-              />
+              <div className="pin-code-grid" role="group" aria-label="4-digit folder PIN">
+                {pinDigits.map((digit, index) => (
+                  <input
+                    key={index}
+                    ref={(node) => { pinRefs.current[index] = node }}
+                    type="text"
+                    value={digit}
+                    onChange={(e) => handlePinChange(index, e.target.value)}
+                    onKeyDown={(e) => handlePinKeyDown(index, e)}
+                    onPaste={(e) => handlePinPaste(index, e)}
+                    className="pin-code-input focus-ring"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={1}
+                    autoComplete={index === 0 ? 'one-time-code' : 'off'}
+                    aria-label={`PIN digit ${index + 1}`}
+                    disabled={busy}
+                  />
+                ))}
+              </div>
               {error && <p className="text-xs text-red-400" role="alert">{error}</p>}
             </div>
 

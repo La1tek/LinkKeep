@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-async function mockAuthedApi(page) {
+async function mockAuthedApi(page, { tabs = [], links = [] } = {}) {
   await page.route('**/api/auth/register', async (route) => {
     await route.fulfill({ json: { id: 1, username: 'demo', created_at: '2026-07-07T00:00:00Z' } })
   })
@@ -10,11 +10,11 @@ async function mockAuthedApi(page) {
   await page.route('**/api/auth/me', async (route) => {
     await route.fulfill({ json: { id: 1, username: 'demo', created_at: '2026-07-07T00:00:00Z' } })
   })
-  await page.route('**/api/tabs**', async (route) => {
-    await route.fulfill({ json: [] })
+  await page.route('**/api/tabs', async (route) => {
+    await route.fulfill({ json: tabs })
   })
   await page.route('**/api/links**', async (route) => {
-    await route.fulfill({ json: [] })
+    await route.fulfill({ json: links })
   })
   await page.route('**/api/stats', async (route) => {
     await route.fulfill({ json: { total_links: 0, total_tabs: 0, total_favorites: 0, total_pinned: 0, recent_links: [] } })
@@ -100,4 +100,46 @@ test('opens a public share without auth', async ({ page }) => {
   await page.goto('/share/share-token')
   await expect(page.getByRole('heading', { name: 'Public collection' })).toBeVisible()
   await expect(page.getByText('Shared link')).toBeVisible()
+})
+
+test('sets folder PIN with four digit inputs', async ({ page }) => {
+  await mockAuthedApi(page, {
+    tabs: [
+      {
+        id: 42,
+        name: 'Design System',
+        color: '#7c8cff',
+        parent_id: null,
+        link_count: 0,
+        total_link_count: 0,
+        child_count: 0,
+        is_locked: false,
+        is_unlocked: false,
+      },
+    ],
+  })
+  await page.route('**/api/tabs/42/lock', async (route) => {
+    expect(route.request().method()).toBe('POST')
+    expect(JSON.parse(route.request().postData())).toEqual({ password: '1234' })
+    await route.fulfill({ json: { status: 'ok' } })
+  })
+  await page.addInitScript(() => {
+    window.localStorage.setItem('lk_token', 'test-token')
+    window.localStorage.setItem('lk_user', JSON.stringify({ id: 1, username: 'demo', created_at: '2026-07-07T00:00:00Z' }))
+  })
+
+  await page.goto('/')
+
+  await page.getByRole('button', { name: 'Open actions for Design System', exact: true }).click()
+  await page.getByRole('button', { name: 'Set PIN' }).click()
+  await expect(page.getByRole('heading', { name: 'Protect folder' })).toBeVisible()
+  await expect(page.getByRole('group', { name: '4-digit folder PIN' }).locator('input')).toHaveCount(4)
+
+  await page.getByLabel('PIN digit 1').fill('1')
+  await page.getByLabel('PIN digit 2').fill('2')
+  await page.getByLabel('PIN digit 3').fill('3')
+  await page.getByLabel('PIN digit 4').fill('4')
+  await page.getByRole('button', { name: 'Set PIN' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Protect folder' })).toHaveCount(0)
 })
