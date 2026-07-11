@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import re
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -13,11 +13,15 @@ from app.database import get_db
 from app.models import (
     AuditLog,
     AutomationRule,
+    AppNotification,
+    Job,
     Link,
+    LinkHistory,
     LinkHealthCheck,
     LinkHighlight,
     LinkSummary,
     SmartCollection,
+    Tab,
     User,
     WebhookDelivery,
     WebhookEndpoint,
@@ -27,10 +31,18 @@ from app.models import (
 from app.routers.auth import _get_current_user
 from app.schemas import LinkOut
 from app.services.automation import apply_automation_rules, record_webhook_event
+from app.services.embeddings import rebuild_user_embeddings, semantic_rank as embedding_rank, upsert_link_embedding
+from app.services.link_service import validate_public_http_url
 from app.services.search_query import apply_db_filters, apply_python_filters, parse_search_query
 from app.services.search_index import upsert_link_index
 
 router = APIRouter(prefix="/api", tags=["productivity"])
+
+
+TRACKING_PARAMS = {
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "utm_id",
+    "fbclid", "gclid", "dclid", "yclid", "mc_cid", "mc_eid", "igshid", "ref",
+}
 
 
 class RuleIn(BaseModel):
@@ -76,6 +88,25 @@ class ProfileIn(BaseModel):
     is_public: bool = True
 
 
+class AssistantQuery(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+    limit: int = Field(default=8, ge=1, le=20)
+
+
+class ReminderIn(BaseModel):
+    link_id: int
+    remind_at: datetime
+
+
+class SnoozeIn(BaseModel):
+    remind_at: datetime
+
+
+class CommandRun(BaseModel):
+    command: str = Field(min_length=1, max_length=80)
+    payload: dict = Field(default_factory=dict)
+
+
 def _rule_out(rule: AutomationRule) -> dict:
     return {
         "id": rule.id,
@@ -92,6 +123,26 @@ def _rule_out(rule: AutomationRule) -> dict:
 
 def _link_payload(link: Link) -> dict:
     return LinkOut.model_validate(link).model_dump(mode="json")
+
+
+def _canonicalize_url(url: str) -> str:
+    parsed = urlparse(url.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return url.strip()
+    hostname = (parsed.hostname or "").lower()
+    if hostname.startswith("www."):
+        hostname = hostname[4:]
+    if hostname.startswith("m.") and hostname.count(".") >= 2:
+        hostname = hostname[2:]
+    port = f":{parsed.port}" if parsed.port else ""
+    path = parsed.path.rstrip("/") or "/"
+    query_items = [
+        (key, value)
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+        if key.lower() not in TRACKING_PARAMS and not key.lower().startswith("utm_")
+    ]
+    query = urlencode(query_items, doseq=True)
+    return urlunparse((parsed.scheme.lower(), f"{hostname}{port}", path, "", query, "")).lower()
 
 
 def _tokenize(text: str) -> set[str]:
@@ -177,6 +228,19 @@ def _toc_from_text(text: str) -> list[dict]:
         if len(toc) >= 12:
             break
     return toc
+
+
+def _answer_from_links(question: str, ranked: list[tuple[float, Link]]) -> str:
+    if not ranked:
+        return "I could not find saved links that match this question yet."
+    focus = ", ".join(link.title for _, link in ranked[:3])
+    tags = []
+    for _, link in ranked:
+        for tag in link.tags or []:
+            if tag not in tags:
+                tags.append(tag)
+    tag_text = f" Common tags: {', '.join(tags[:8])}." if tags else ""
+    return f"Found {len(ranked)} relevant saved links for: {question}. Start with {focus}.{tag_text}"
 
 
 @router.get("/rules")
@@ -360,6 +424,7 @@ def summarize_link(link_id: int, user: User = Depends(_get_current_user), db: Se
     db.add(summary)
     link.tags = list(dict.fromkeys([*(link.tags or []), *data["suggested_tags"][:3]]))
     upsert_link_index(db, link)
+    upsert_link_embedding(db, link)
     db.commit()
     db.refresh(summary)
     return {
@@ -370,11 +435,23 @@ def summarize_link(link_id: int, user: User = Depends(_get_current_user), db: Se
     }
 
 
+@router.post("/embeddings/rebuild")
+def rebuild_embeddings(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    indexed = rebuild_user_embeddings(db, user.id)
+    db.commit()
+    return {"indexed": indexed, "provider": "local-hash"}
+
+
 @router.get("/search/semantic")
 def semantic_search(q: str = Query(min_length=1), limit: int = Query(20, ge=1, le=100), user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
-    links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).limit(1000).all()
-    ranked = _semantic_rank(q, links, limit)
-    return {"query": q, "links": [{"score": item["score"], "link": _link_payload(item["link"])} for item in ranked]}
+    rebuild_user_embeddings(db, user.id)
+    db.commit()
+    ranked = embedding_rank(db, user.id, q, limit)
+    if not ranked:
+        links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).limit(1000).all()
+        fallback = _semantic_rank(q, links, limit)
+        return {"query": q, "provider": "lexical-fallback", "links": [{"score": item["score"], "link": _link_payload(item["link"])} for item in fallback]}
+    return {"query": q, "provider": "local-hash", "links": [{"score": round(score, 4), "link": _link_payload(link)} for score, link in ranked]}
 
 
 @router.get("/links/{link_id}/related")
@@ -382,10 +459,39 @@ def related_links(link_id: int, limit: int = Query(8, ge=1, le=30), user: User =
     link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id, Link.deleted_at.is_(None)).first()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
-    query = " ".join([link.title or "", " ".join(link.tags or []), link.description or ""])
-    candidates = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None), Link.id != link.id).limit(1000).all()
-    ranked = _semantic_rank(query, candidates, limit)
-    return {"link_id": link.id, "related": [{"score": item["score"], "link": _link_payload(item["link"])} for item in ranked]}
+    upsert_link_embedding(db, link)
+    rebuild_user_embeddings(db, user.id)
+    db.commit()
+    ranked = embedding_rank(db, user.id, " ".join([link.title or "", " ".join(link.tags or []), link.description or "", link.content or ""]), limit, exclude_link_id=link.id)
+    return {"link_id": link.id, "provider": "local-hash", "related": [{"score": round(score, 4), "link": _link_payload(item)} for score, item in ranked]}
+
+
+@router.post("/assistant/query")
+def assistant_query(data: AssistantQuery, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    rebuild_user_embeddings(db, user.id)
+    db.commit()
+    ranked = embedding_rank(db, user.id, data.question, data.limit)
+    sources = [
+        {
+            "score": round(score, 4),
+            "id": link.id,
+            "title": link.title,
+            "url": link.url,
+            "description": link.description,
+            "tags": link.tags or [],
+            "excerpt": (link.content or link.note or link.description or "")[:500],
+        }
+        for score, link in ranked
+    ]
+    db.add(AppNotification(
+        user_id=user.id,
+        type="assistant",
+        title="Assistant query",
+        body=data.question[:160],
+        payload={"source_ids": [item["id"] for item in sources]},
+    ))
+    db.commit()
+    return {"question": data.question, "answer": _answer_from_links(data.question, ranked), "sources": sources}
 
 
 @router.get("/smart/{collection_id}/links")
@@ -421,6 +527,192 @@ def link_health_history(link_id: int, user: User = Depends(_get_current_user), d
         raise HTTPException(status_code=404, detail="Link not found")
     checks = db.query(LinkHealthCheck).filter(LinkHealthCheck.link_id == link.id, LinkHealthCheck.user_id == user.id).order_by(LinkHealthCheck.checked_at.desc()).limit(100).all()
     return {"link_id": link.id, "checks": [{"id": row.id, "status": row.status, "final_url": row.final_url, "error": row.error, "checked_at": row.checked_at} for row in checks]}
+
+
+@router.get("/knowledge-graph")
+def knowledge_graph(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).order_by(Link.created_at.desc()).limit(500).all()
+    nodes: list[dict] = []
+    edges: list[dict] = []
+    seen_nodes: set[str] = set()
+
+    def add_node(node_id: str, label: str, type_: str, weight: int = 1, color: str | None = None) -> None:
+        if node_id in seen_nodes:
+            return
+        seen_nodes.add(node_id)
+        nodes.append({"id": node_id, "label": label, "type": type_, "weight": weight, "color": color})
+
+    tag_counts: dict[str, int] = {}
+    site_counts: dict[str, int] = {}
+    for link in links:
+        host = urlparse(link.url).hostname or "unknown"
+        site = host.removeprefix("www.")
+        site_counts[site] = site_counts.get(site, 0) + 1
+        for tag in link.tags or []:
+            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+
+    for link in links:
+        link_id = f"link:{link.id}"
+        add_node(link_id, link.title, "link", 1, "#7c8cff")
+        site = (urlparse(link.url).hostname or "unknown").removeprefix("www.")
+        site_id = f"site:{site}"
+        add_node(site_id, site, "site", site_counts.get(site, 1), "#2dd4bf")
+        edges.append({"source": link_id, "target": site_id, "type": "site"})
+        if link.tab:
+            folder_id = f"folder:{link.tab.id}"
+            add_node(folder_id, link.tab.name, "folder", link.tab.link_count if hasattr(link.tab, "link_count") else 1, link.tab.color)
+            edges.append({"source": link_id, "target": folder_id, "type": "folder"})
+        for tag in link.tags or []:
+            tag_id = f"tag:{tag}"
+            add_node(tag_id, tag, "tag", tag_counts.get(tag, 1), "#f59e0b")
+            edges.append({"source": link_id, "target": tag_id, "type": "tag"})
+
+    clusters = [
+        {"id": f"cluster:tag:{tag}", "label": tag, "count": count}
+        for tag, count in sorted(tag_counts.items(), key=lambda item: item[1], reverse=True)[:12]
+    ]
+    return {"nodes": nodes, "edges": edges[:2000], "clusters": clusters}
+
+
+@router.get("/reminders")
+def list_reminders(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    rows = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None), Link.reminder_at.isnot(None)).order_by(Link.reminder_at.asc()).limit(200).all()
+    return {"reminders": [_link_payload(link) for link in rows]}
+
+
+@router.post("/reminders", status_code=201)
+def create_reminder(data: ReminderIn, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    link = db.query(Link).filter(Link.id == data.link_id, Link.user_id == user.id, Link.deleted_at.is_(None)).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+    link.reminder_at = data.remind_at
+    db.add(AuditLog(user_id=user.id, action="reminder.created", payload={"link_id": link.id, "reminder_at": data.remind_at.isoformat()}))
+    db.commit()
+    db.refresh(link)
+    return _link_payload(link)
+
+
+@router.post("/reminders/{link_id}/snooze")
+def snooze_reminder(link_id: int, data: SnoozeIn, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id, Link.deleted_at.is_(None)).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+    link.reminder_at = data.remind_at
+    db.add(AuditLog(user_id=user.id, action="reminder.snoozed", payload={"link_id": link.id, "reminder_at": data.remind_at.isoformat()}))
+    db.commit()
+    return _link_payload(link)
+
+
+@router.delete("/reminders/{link_id}", status_code=204)
+def clear_reminder(link_id: int, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    link = db.query(Link).filter(Link.id == link_id, Link.user_id == user.id, Link.deleted_at.is_(None)).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+    link.reminder_at = None
+    db.commit()
+
+
+@router.post("/reminders/process")
+def process_due_reminders(user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    job = Job(type="process_reminders", user_id=user.id, payload={}, status="queued")
+    db.add(job)
+    db.commit()
+    return {"job_id": job.id, "status": job.status}
+
+
+@router.post("/digest/{kind}")
+def create_digest(kind: str, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    if kind not in {"daily", "weekly"}:
+        raise HTTPException(status_code=400, detail="Digest kind must be daily or weekly")
+    job = Job(type=f"{kind}_digest", user_id=user.id, payload={}, status="queued")
+    db.add(job)
+    db.commit()
+    return {"job_id": job.id, "type": job.type, "status": job.status}
+
+
+@router.get("/digest/preview/{kind}")
+def digest_preview(kind: str, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    if kind not in {"daily", "weekly"}:
+        raise HTTPException(status_code=400, detail="Digest kind must be daily or weekly")
+    days = 7 if kind == "weekly" else 1
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    new_links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None), Link.created_at >= cutoff).order_by(Link.created_at.desc()).limit(20).all()
+    unread = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None), Link.is_read == False).order_by(Link.created_at.desc()).limit(20).all()
+    stale_cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+    stale = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None), Link.is_read == False, Link.created_at <= stale_cutoff).order_by(Link.created_at.asc()).limit(10).all()
+    return {"kind": kind, "new_links": [_link_payload(link) for link in new_links], "unread": [_link_payload(link) for link in unread], "stale_unread": [_link_payload(link) for link in stale]}
+
+
+@router.get("/commands")
+def command_palette(q: str | None = None, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    query = (q or "").lower()
+    base = [
+        {"id": "new-link", "label": "Create link", "hint": "Save a URL", "route": "/folder/all", "type": "action"},
+        {"id": "search", "label": "Search links", "hint": "Open search", "route": "/search", "type": "navigation"},
+        {"id": "workflows", "label": "Open Workflow Hub", "hint": "Rules, assistant, graph", "route": "/workflows", "type": "navigation"},
+        {"id": "digest-daily", "label": "Create daily digest", "hint": "Queue reading digest", "type": "action"},
+        {"id": "rebuild-embeddings", "label": "Rebuild embeddings", "hint": "Refresh semantic search", "type": "action"},
+    ]
+    folders = [
+        {"id": f"folder:{tab.id}", "label": f"Go to {tab.name}", "hint": "Folder", "route": f"/folder/{tab.id}", "type": "folder"}
+        for tab in user.tabs[:50]
+    ]
+    tags = sorted({tag for link in db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).limit(500).all() for tag in (link.tags or [])})
+    tag_commands = [{"id": f"tag:{tag}", "label": f"Find tag {tag}", "hint": "Tag search", "route": f"/search?q=tag:{tag}", "type": "tag"} for tag in tags[:50]]
+    commands = [*base, *folders, *tag_commands]
+    if query:
+        commands = [item for item in commands if query in item["label"].lower() or query in item.get("hint", "").lower()]
+    return {"commands": commands[:80]}
+
+
+@router.post("/commands/run")
+def run_command(data: CommandRun, user: User = Depends(_get_current_user), db: Session = Depends(get_db)):
+    if data.command == "digest-daily":
+        job = Job(type="daily_digest", user_id=user.id, payload={}, status="queued")
+        db.add(job)
+        db.commit()
+        return {"status": "queued", "job_id": job.id}
+    if data.command == "rebuild-embeddings":
+        indexed = rebuild_user_embeddings(db, user.id)
+        db.commit()
+        return {"status": "ok", "indexed": indexed}
+    if data.command == "new-link":
+        payload = data.payload or {}
+        url = payload.get("url")
+        title = payload.get("title") or url
+        if not url:
+            raise HTTPException(status_code=400, detail="url is required")
+        validate_public_http_url(url)
+        tab_id = payload.get("tab_id")
+        if tab_id is not None:
+            try:
+                tab_id = int(tab_id)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="tab_id must be numeric")
+        if tab_id is not None and not db.query(Tab).filter(Tab.id == tab_id, Tab.user_id == user.id).first():
+            raise HTTPException(status_code=404, detail="Tab not found")
+        max_order = db.query(Link).filter(Link.user_id == user.id).count()
+        link = Link(
+            user_id=user.id,
+            title=title[:256],
+            url=url,
+            canonical_url=_canonicalize_url(url),
+            tags=payload.get("tags") or [],
+            tab_id=tab_id,
+            note=payload.get("note"),
+            sort_order=max_order,
+        )
+        db.add(link)
+        db.flush()
+        db.add(LinkHistory(link_id=link.id, user_id=user.id, action="created", changes={"source": "command_palette", "url": link.url}))
+        apply_automation_rules(db, link, "link_created")
+        record_webhook_event(db, user.id, "link.created", {"link_id": link.id, "title": link.title, "url": link.url})
+        upsert_link_index(db, link)
+        upsert_link_embedding(db, link)
+        db.commit()
+        db.refresh(link)
+        return {"status": "created", "link": _link_payload(link)}
+    raise HTTPException(status_code=400, detail="Unsupported command")
 
 
 @router.get("/workspaces")

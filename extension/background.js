@@ -1,4 +1,4 @@
-// LinkKeep Extension v2.7 — background service worker with bidirectional bookmark sync
+// LinkKeep Extension v2.8 — background service worker with bidirectional bookmark sync and page overlay
 
 const SYNC_FOLDER = 'LinkKeep';
 const SYNC_ALARM_NAME = 'linkkeep-sync';
@@ -447,10 +447,54 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === 'overlay_bootstrap') {
+    (async () => {
+      const link = await findLinkByUrl(msg.url).catch(() => null);
+      const tabs = await apiFetch('/tabs').catch(() => []);
+      sendResponse({ ok: true, data: { saved: !!link, link, tabs } });
+    })().catch(err => sendResponse({ ok: false, data: { detail: err.message } }));
+    return true;
+  }
+
   if (msg.type === 'save_page') {
     saveUrlToLinkKeep(msg.payload || {})
       .then(data => sendResponse({ ok: true, data }))
       .catch(err => sendResponse({ ok: false, data: { detail: err.message } }));
+    return true;
+  }
+
+  if (msg.type === 'overlay_save_highlight') {
+    (async () => {
+      const payload = msg.payload || {};
+      const text = (payload.text || '').trim();
+      if (!text) throw new Error('No selected text');
+      const link = await saveUrlToLinkKeep({ url: payload.url, title: payload.title });
+      await apiFetch(`/links/${link.id}/highlights`, 'POST', {
+        text,
+        source_url: payload.url,
+      });
+      sendResponse({ ok: true, data: link });
+    })().catch(err => sendResponse({ ok: false, data: { detail: err.message } }));
+    return true;
+  }
+
+  if (msg.type === 'overlay_reader') {
+    (async () => {
+      const link = await findLinkByUrl(msg.url);
+      if (!link) throw new Error('Save this page first');
+      const reader = await apiFetch(`/reader/${link.id}`);
+      sendResponse({ ok: true, data: reader });
+    })().catch(err => sendResponse({ ok: false, data: { detail: err.message } }));
+    return true;
+  }
+
+  if (msg.type === 'overlay_update_link') {
+    (async () => {
+      const payload = msg.payload || {};
+      if (!payload.linkId) throw new Error('Link id is required');
+      const updated = await apiFetch(`/links/${payload.linkId}`, 'PUT', payload.patch || {});
+      sendResponse({ ok: true, data: updated });
+    })().catch(err => sendResponse({ ok: false, data: { detail: err.message } }));
     return true;
   }
 

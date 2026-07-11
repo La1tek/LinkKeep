@@ -11,17 +11,28 @@ from sqlalchemy.orm import Session
 
 from app import config
 from app.database import SessionLocal
-from app.models import BackupSnapshot, Job, Link, LinkHealthCheck, User
+from app.models import AppNotification, BackupSnapshot, Job, Link, LinkHealthCheck, User
 from app.routers.settings import _export_user_data
 from app.services.archive import create_link_archive
 from app.services.automation import apply_automation_rules
+from app.services.embeddings import rebuild_user_embeddings, upsert_link_embedding
 from app.services.link_service import fetch_metadata, validate_public_http_url
 from app.services.search_index import rebuild_user_index, upsert_link_index
 
 logger = logging.getLogger("linkkeep.jobs")
 
 
-JOB_TYPES = {"backup_snapshot", "rebuild_search_index", "refresh_metadata", "check_link_health", "archive_links"}
+JOB_TYPES = {
+    "backup_snapshot",
+    "rebuild_search_index",
+    "rebuild_embeddings",
+    "refresh_metadata",
+    "check_link_health",
+    "archive_links",
+    "process_reminders",
+    "daily_digest",
+    "weekly_digest",
+}
 
 
 def enqueue_job(db: Session, job_type: str, user_id: int | None, payload: dict | None = None) -> Job:
@@ -97,6 +108,10 @@ def run_job(db: Session, job: Job) -> dict:
         indexed = rebuild_user_index(db, user.id)
         return {"indexed": indexed}
 
+    if job.type == "rebuild_embeddings":
+        indexed = rebuild_user_embeddings(db, user.id, int(job.payload.get("limit", 1000)))
+        return {"indexed": indexed}
+
     if job.type == "refresh_metadata":
         limit = int(job.payload.get("limit", 25))
         links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None)).order_by(Link.updated_at.desc()).limit(limit).all()
@@ -108,6 +123,7 @@ def run_job(db: Session, job: Job) -> dict:
                 if value:
                     setattr(link, field, value)
             upsert_link_index(db, link)
+            upsert_link_embedding(db, link)
             refreshed += 1
         return {"refreshed": refreshed}
 
@@ -149,6 +165,47 @@ def run_job(db: Session, job: Job) -> dict:
             asyncio.run(create_link_archive(db, link))
             archived += 1
         return {"archived": archived}
+
+    if job.type == "process_reminders":
+        now = datetime.now(timezone.utc)
+        links = (
+            db.query(Link)
+            .filter(Link.user_id == user.id, Link.deleted_at.is_(None), Link.reminder_at.isnot(None), Link.reminder_at <= now)
+            .order_by(Link.reminder_at.asc())
+            .limit(int(job.payload.get("limit", 50)))
+            .all()
+        )
+        for link in links:
+            db.add(AppNotification(
+                user_id=user.id,
+                type="reminder",
+                title="Reading reminder",
+                body=link.title,
+                payload={"link_id": link.id, "url": link.url},
+            ))
+            link.reminder_at = None
+        return {"reminders": len(links)}
+
+    if job.type in {"daily_digest", "weekly_digest"}:
+        days = 7 if job.type == "weekly_digest" else 1
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        new_links = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None), Link.created_at >= cutoff).order_by(Link.created_at.desc()).limit(20).all()
+        unread = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None), Link.is_read == False).order_by(Link.created_at.desc()).limit(20).all()
+        stale_cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+        stale = db.query(Link).filter(Link.user_id == user.id, Link.deleted_at.is_(None), Link.is_read == False, Link.created_at <= stale_cutoff).order_by(Link.created_at.asc()).limit(10).all()
+        payload = {
+            "new_links": [{"id": link.id, "title": link.title, "url": link.url} for link in new_links],
+            "unread": [{"id": link.id, "title": link.title, "url": link.url} for link in unread],
+            "stale_unread": [{"id": link.id, "title": link.title, "url": link.url} for link in stale],
+        }
+        db.add(AppNotification(
+            user_id=user.id,
+            type=job.type,
+            title="Weekly reading digest" if job.type == "weekly_digest" else "Daily reading digest",
+            body=f"{len(new_links)} new, {len(unread)} unread, {len(stale)} stale unread",
+            payload=payload,
+        ))
+        return {"new": len(new_links), "unread": len(unread), "stale_unread": len(stale)}
 
     raise ValueError("Unsupported job type")
 

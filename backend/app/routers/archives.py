@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Link, LinkArchive, User
 from app.routers.auth import _get_current_user
-from app.services.archive import create_link_archive
+from app.services.archive import create_link_archive, load_archive_payload
 from app.services.folder_access import parse_unlock_tokens, require_tab_access
 
 
@@ -24,14 +24,21 @@ def _archive_out(archive: LinkArchive, include_payload: bool = False) -> dict:
         "has_text": bool(archive.readable_text),
         "has_screenshot": bool(archive.screenshot_data_url),
         "has_pdf": bool(archive.pdf_data_url),
+        "engine": archive.engine,
+        "retry_count": archive.retry_count,
+        "content_hash": archive.content_hash,
+        "changed_from_archive_id": archive.changed_from_archive_id,
+        "diff_summary": archive.diff_summary,
+        "storage_manifest": archive.storage_manifest or {},
     }
     if include_payload:
+        stored_payload = load_archive_payload(archive)
         data.update(
             {
-                "html_snapshot": archive.html_snapshot,
-                "readable_text": archive.readable_text,
-                "screenshot_data_url": archive.screenshot_data_url,
-                "pdf_data_url": archive.pdf_data_url,
+                "html_snapshot": archive.html_snapshot or stored_payload.get("html_snapshot"),
+                "readable_text": archive.readable_text or stored_payload.get("readable_text"),
+                "screenshot_data_url": archive.screenshot_data_url or stored_payload.get("screenshot_data_url"),
+                "pdf_data_url": archive.pdf_data_url or stored_payload.get("pdf_data_url"),
             }
         )
     return data

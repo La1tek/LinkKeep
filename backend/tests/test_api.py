@@ -745,6 +745,40 @@ class TestArchiveSearchCollabAndLocks:
         assert results.status_code == 200
         assert results.json()["count"] == 1
 
+    def test_archive_engine_storage_retry_and_diff_contract(self, client, auth_user, monkeypatch, tmp_path):
+        from app.services import archive as archive_service
+
+        monkeypatch.setattr(archive_service.config, "ARCHIVE_STORAGE_DIR", str(tmp_path))
+        monkeypatch.setattr(archive_service.config, "ARCHIVE_STORAGE_DRIVER", "disk")
+        monkeypatch.setattr(archive_service.config, "ARCHIVE_RETRY_COUNT", 0)
+        payloads = [
+            ("<html><body>Archive alpha text</body></html>", "Archive alpha text"),
+            ("<html><body>Archive alpha beta changed text</body></html>", "Archive alpha beta changed text"),
+        ]
+
+        async def fake_capture(link):
+            html, text = payloads.pop(0)
+            return html, text, b"fake-png", b"%PDF-1.4\nfake", link.url, "playwright"
+
+        monkeypatch.setattr(archive_service, "_capture_archive_payload", fake_capture)
+        link = client.post("/api/links", json={"title": "Archive diff", "url": "https://example.com/archive"}, headers=auth_user).json()
+
+        first = client.post(f"/api/links/{link['id']}/archive", headers=auth_user)
+        assert first.status_code == 201
+        assert first.json()["engine"] == "playwright"
+        assert first.json()["retry_count"] == 0
+        assert first.json()["storage_manifest"]["html"]["driver"] == "disk"
+        assert first.json()["content_hash"]
+
+        second = client.post(f"/api/links/{link['id']}/archive", headers=auth_user)
+        assert second.status_code == 201
+        assert second.json()["changed_from_archive_id"] == first.json()["id"]
+        assert "beta" in second.json()["diff_summary"]
+
+        payload = client.get(f"/api/archives/{second.json()['id']}", headers=auth_user)
+        assert payload.status_code == 200
+        assert "Archive alpha beta changed text" in payload.json()["readable_text"]
+
     def test_saved_search_and_smart_collection(self, client, auth_user):
         saved = client.post("/api/search/saved", json={"name": "Docs", "query": "tag:docs"}, headers=auth_user)
         assert saved.status_code == 201
@@ -920,3 +954,73 @@ class TestProductivitySuite:
         public = client.get("/api/public/profiles/testuser")
         assert public.status_code == 200
         assert public.json()["display_name"] == "Ilya Links"
+
+    def test_ai_graph_digest_reminders_and_command_palette(self, client, auth_user):
+        react = client.post(
+            "/api/links",
+            json={"title": "React performance notes", "url": "https://react.dev/learn/render-and-commit", "tags": ["react", "performance"]},
+            headers=auth_user,
+        ).json()
+        design = client.post(
+            "/api/links",
+            json={"title": "Design systems guide", "url": "https://design.example.com/system", "tags": ["design"]},
+            headers=auth_user,
+        ).json()
+        client.put(
+            f"/api/links/{react['id']}",
+            json={"content": "React rendering performance memoization profiler transitions expensive components."},
+            headers=auth_user,
+        )
+        client.put(
+            f"/api/links/{design['id']}",
+            json={"content": "Design systems tokens components typography spacing dashboard patterns."},
+            headers=auth_user,
+        )
+
+        rebuild = client.post("/api/embeddings/rebuild", headers=auth_user)
+        assert rebuild.status_code == 200
+        assert rebuild.json()["indexed"] >= 2
+
+        assistant = client.post("/api/assistant/query", json={"question": "Find React performance material", "limit": 5}, headers=auth_user)
+        assert assistant.status_code == 200
+        assert assistant.json()["sources"][0]["id"] == react["id"]
+        assert "React performance" in assistant.json()["answer"]
+
+        graph = client.get("/api/knowledge-graph", headers=auth_user)
+        assert graph.status_code == 200
+        assert any(node["type"] == "tag" and node["label"] == "react" for node in graph.json()["nodes"])
+        assert graph.json()["edges"]
+
+        reminder = client.post(
+            "/api/reminders",
+            json={"link_id": react["id"], "remind_at": "2026-01-01T10:00:00Z"},
+            headers=auth_user,
+        )
+        assert reminder.status_code == 201
+        assert client.get("/api/reminders", headers=auth_user).json()["reminders"][0]["id"] == react["id"]
+        snooze = client.post(
+            f"/api/reminders/{react['id']}/snooze",
+            json={"remind_at": "2026-01-02T10:00:00Z"},
+            headers=auth_user,
+        )
+        assert snooze.status_code == 200
+        assert client.delete(f"/api/reminders/{react['id']}", headers=auth_user).status_code == 204
+
+        digest = client.get("/api/digest/preview/daily", headers=auth_user)
+        assert digest.status_code == 200
+        assert len(digest.json()["unread"]) >= 2
+        digest_job = client.post("/api/digest/daily", headers=auth_user)
+        assert digest_job.status_code == 200
+        assert digest_job.json()["type"] == "daily_digest"
+
+        commands = client.get("/api/commands?q=react", headers=auth_user)
+        assert commands.status_code == 200
+        assert any(item["id"] == "tag:react" for item in commands.json()["commands"])
+        created = client.post(
+            "/api/commands/run",
+            json={"command": "new-link", "payload": {"url": "https://example.com/cmd", "title": "From command", "tags": ["cmd"]}},
+            headers=auth_user,
+        )
+        assert created.status_code == 200
+        assert created.json()["link"]["canonical_url"] == "https://example.com/cmd"
+        assert created.json()["link"]["tags"] == ["cmd"]

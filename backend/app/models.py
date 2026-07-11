@@ -84,6 +84,7 @@ class Link(Base):
     attachments = relationship("LinkAttachment", back_populates="link", cascade="all, delete-orphan", order_by="desc(LinkAttachment.created_at)")
     health_checks = relationship("LinkHealthCheck", back_populates="link", cascade="all, delete-orphan", order_by="desc(LinkHealthCheck.checked_at)")
     summaries = relationship("LinkSummary", back_populates="link", cascade="all, delete-orphan", order_by="desc(LinkSummary.created_at)")
+    embedding = relationship("LinkEmbedding", back_populates="link", cascade="all, delete-orphan", uselist=False)
 
     @property
     def archive_status(self) -> str | None:
@@ -189,11 +190,32 @@ class LinkArchive(Base):
     readable_text = Column(Text, nullable=True)
     screenshot_data_url = Column(Text, nullable=True)
     pdf_data_url = Column(Text, nullable=True)
+    storage_manifest = Column(JSON, default=dict)
+    content_hash = Column(String(128), nullable=True, index=True)
+    changed_from_archive_id = Column(Integer, ForeignKey("link_archives.id", ondelete="SET NULL"), nullable=True)
+    diff_summary = Column(Text, nullable=True)
+    retry_count = Column(Integer, default=0, nullable=False)
+    engine = Column(String(32), default="http", nullable=False)
     source_url = Column(Text, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
     link = relationship("Link", back_populates="archives")
+
+
+class LinkEmbedding(Base):
+    __tablename__ = "link_embeddings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    link_id = Column(Integer, ForeignKey("links.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    provider = Column(String(48), default="local-hash", nullable=False)
+    text_hash = Column(String(128), nullable=False, index=True)
+    vector = Column(JSON, default=list)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    link = relationship("Link", back_populates="embedding")
+    user = relationship("User")
 
 
 class FolderUnlockSession(Base):

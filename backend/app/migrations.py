@@ -15,6 +15,12 @@ MIGRATIONS = [
     ("20260708_links_priority", "links", "priority", "ALTER TABLE links ADD COLUMN priority VARCHAR(16) DEFAULT 'normal'"),
     ("20260708_links_reminder_at", "links", "reminder_at", "ALTER TABLE links ADD COLUMN reminder_at TIMESTAMP"),
     ("20260708_links_deleted_at", "links", "deleted_at", "ALTER TABLE links ADD COLUMN deleted_at TIMESTAMP"),
+    ("20260708_archives_storage_manifest", "link_archives", "storage_manifest", "ALTER TABLE link_archives ADD COLUMN storage_manifest JSON"),
+    ("20260708_archives_content_hash", "link_archives", "content_hash", "ALTER TABLE link_archives ADD COLUMN content_hash VARCHAR(128)"),
+    ("20260708_archives_changed_from", "link_archives", "changed_from_archive_id", "ALTER TABLE link_archives ADD COLUMN changed_from_archive_id INTEGER"),
+    ("20260708_archives_diff_summary", "link_archives", "diff_summary", "ALTER TABLE link_archives ADD COLUMN diff_summary TEXT"),
+    ("20260708_archives_retry_count", "link_archives", "retry_count", "ALTER TABLE link_archives ADD COLUMN retry_count INTEGER DEFAULT 0"),
+    ("20260708_archives_engine", "link_archives", "engine", "ALTER TABLE link_archives ADD COLUMN engine VARCHAR(32) DEFAULT 'http'"),
 ]
 
 
@@ -212,3 +218,20 @@ def run_startup_migrations(engine):
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_webhook_deliveries_webhook_id ON webhook_deliveries(webhook_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_webhook_deliveries_user_id ON webhook_deliveries(user_id)")
         conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_webhook_deliveries_event ON webhook_deliveries(event)")
+
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_link_archives_content_hash ON link_archives(content_hash)")
+
+        conn.exec_driver_sql(
+            "CREATE TABLE IF NOT EXISTS link_embeddings ("
+            "id INTEGER PRIMARY KEY, "
+            "link_id INTEGER NOT NULL UNIQUE REFERENCES links(id) ON DELETE CASCADE, "
+            "user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
+            "provider VARCHAR(48) DEFAULT 'local-hash' NOT NULL, "
+            "text_hash VARCHAR(128) NOT NULL, "
+            "vector JSON, "
+            "updated_at TIMESTAMP NOT NULL"
+            ")"
+        )
+        conn.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS ix_link_embeddings_link_id ON link_embeddings(link_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_link_embeddings_user_id ON link_embeddings(user_id)")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_link_embeddings_text_hash ON link_embeddings(text_hash)")

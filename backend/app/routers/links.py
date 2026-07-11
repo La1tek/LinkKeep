@@ -11,6 +11,7 @@ from app.schemas import (
 )
 from app.routers.auth import _get_current_user
 from app.services.automation import apply_automation_rules, record_webhook_event
+from app.services.embeddings import upsert_link_embedding
 from app.services.link_service import validate_public_http_url
 from app.services.search_index import upsert_link_index
 from app.services.folder_access import (
@@ -122,6 +123,10 @@ def _serialize_link_detail(link: Link) -> LinkDetailOut:
                 "has_text": bool(archive.readable_text),
                 "has_screenshot": bool(archive.screenshot_data_url),
                 "has_pdf": bool(archive.pdf_data_url),
+                "engine": archive.engine,
+                "retry_count": archive.retry_count,
+                "changed_from_archive_id": archive.changed_from_archive_id,
+                "diff_summary": archive.diff_summary,
             }
             for archive in link.archives[:20]
         ],
@@ -272,6 +277,7 @@ def create_link(
     db.commit()
     db.refresh(new_link)
     upsert_link_index(db, new_link)
+    upsert_link_embedding(db, new_link)
     db.commit()
     return new_link
 
@@ -307,6 +313,7 @@ def update_link(
     if changes:
         _record_history(db, link, "updated", changes)
     upsert_link_index(db, link)
+    upsert_link_embedding(db, link)
     db.commit()
     db.refresh(link)
     return link
@@ -660,6 +667,7 @@ def create_highlight(link_id: int, data: HighlightCreate, user: User = Depends(_
     db.add(item)
     _record_history(db, link, "highlight_added", {"characters": len(text)})
     upsert_link_index(db, link)
+    upsert_link_embedding(db, link)
     db.commit()
     db.refresh(item)
     return {"id": item.id, "text": item.text, "note": item.note, "source_url": item.source_url, "created_at": item.created_at}
@@ -790,6 +798,7 @@ def fetch_link_content(
     link.content_fetched = datetime.now(timezone.utc)
     _record_history(db, link, "content_fetched", {"characters": len(link.content or "")})
     upsert_link_index(db, link)
+    upsert_link_embedding(db, link)
     db.commit()
     db.refresh(link)
 

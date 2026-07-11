@@ -19,6 +19,7 @@ import WorkflowHub from './pages/WorkflowHub'
 import Sidebar from './components/Sidebar'
 import BottomNav from './components/BottomNav'
 import FolderLockModal from './components/FolderLockModal'
+import CommandPalette from './components/CommandPalette'
 import { ToastContainer, useToast } from './components/Toast'
 import { ConfirmModal, openConfirm } from './components/ConfirmModal'
 import { useTabStore } from './hooks/useTabStore'
@@ -188,6 +189,7 @@ export default function App() {
       </div>
 
       <BottomNav activePath={location.pathname} onNavigate={navigate} />
+      <CommandPalette />
       <FolderLockModal
         open={!!folderLockModal}
         tab={folderLockModal?.tab}
