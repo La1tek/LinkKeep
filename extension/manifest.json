@@ -1,13 +1,21 @@
 {
   "manifest_version": 3,
   "name": "LinkKeep",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "description": "Save & search your LinkKeep bookmarks from any page",
   "permissions": ["activeTab", "storage", "contextMenus", "sidePanel", "bookmarks", "alarms", "tabs", "tabGroups"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content-overlay.js"],
+      "css": ["content-overlay.css"],
+      "run_at": "document_idle"
+    }
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

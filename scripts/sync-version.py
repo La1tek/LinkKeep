@@ -40,6 +40,6 @@ replace("backend/app/version.py", r'APP_VERSION = "[^"]+"', f'APP_VERSION = "{VE
 replace("extension/manifest.json", r'("version":\s*")([^"]+)(")', rf"\g<1>{VERSION}\3")
 replace("extension/options.html", r"LinkKeep Extension</strong> v[^<]+<br>", f"LinkKeep Extension</strong> v{VERSION}<br>")
 replace("frontend/src/pages/Settings.jsx", r'<Row label="Version" value="[^"]+" mono />', f'<Row label="Version" value="{VERSION}" mono />')
-replace("frontend/src/pages/Login.jsx", r"LinkKeep v[0-9.]+", f"LinkKeep v{VERSION.rsplit('.', 1)[0]}")
-replace("frontend/src/components/Sidebar.jsx", r"LinkKeep v[0-9.]+", f"LinkKeep v{VERSION.rsplit('.', 1)[0]}")
+replace("frontend/src/pages/Login.jsx", r"LinkAtlas v[0-9.]+", f"LinkAtlas v{VERSION.rsplit('.', 1)[0]}")
+replace("frontend/src/components/Sidebar.jsx", r"LinkAtlas v[0-9.]+", f"LinkAtlas v{VERSION.rsplit('.', 1)[0]}")
 print(f"Synced version {VERSION}")

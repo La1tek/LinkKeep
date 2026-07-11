@@ -1,4 +1,4 @@
-# LinkKeep Browser Extension v2.7
+# LinkKeep Browser Extension v2.8
 
 A Chrome extension for quick link saving and bookmark sync with your self-hosted LinkKeep instance.
 
@@ -12,6 +12,7 @@ A Chrome extension for quick link saving and bookmark sync with your self-hosted
 - ⚙️ **Settings page** — configure behavior, disconnect
 - 🔄 **Bookmark sync** — optional two-way sync with a dedicated `LinkKeep` bookmarks folder
 - 🔑 **API token login** — paste an `lkat_...` token instead of a password for revocable extension access
+- 🧭 **Page overlay** — saved/unsaved status, inline highlights, reader drawer, and quick folder/tag updates directly on the current page
 
 ## Installation (Chrome / Edge / Brave)
 

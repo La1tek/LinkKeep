@@ -200,7 +200,7 @@ async function mockAuthedApi(page, { tabs = [], links = [] } = {}) {
     await route.fulfill({ json: { total_links: 0, total_tabs: 0, total_favorites: 0, total_pinned: 0, recent_links: [] } })
   })
   await page.route('**/api/health', async (route) => {
-    await route.fulfill({ json: { status: 'ok', version: '2.7.0', bot: false } })
+    await route.fulfill({ json: { status: 'ok', version: '2.8.0', bot: false } })
   })
   await page.route('**/api/auth/sessions', async (route) => {
     await route.fulfill({
